@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 /**
  * A procedural, original model inspired by the Endurance: twelve modules on a
@@ -39,6 +40,36 @@ function panelTexture(base: string, line: string, seed: number) {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
+}
+/**
+ * Bake every mesh under `root` into one mesh per material. The model is ~100
+ * small parts; as separate draw calls it cost as much as the whole planet scene.
+ */
+function mergeByMaterial(root: THREE.Object3D, skip?: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const inverse = root.matrixWorld.clone().invert();
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const meshes: THREE.Mesh[] = [];
+  const walk = (o: THREE.Object3D) => {
+    if (o === skip) return;
+    for (const child of o.children) walk(child);
+    if (!(o instanceof THREE.Mesh)) return;
+    meshes.push(o);
+    const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(
+      inverse.clone().multiply(o.matrixWorld),
+    );
+    g.clearGroups();
+    for (const name of Object.keys(g.attributes)) if (!["position", "normal", "uv"].includes(name)) g.deleteAttribute(name);
+    const m = o.material as THREE.Material;
+    if (!buckets.has(m)) buckets.set(m, []);
+    buckets.get(m)!.push(g);
+  };
+  walk(root);
+  for (const o of meshes) o.removeFromParent();
+  // Drop the now-empty helper groups.
+  for (const child of [...root.children])
+    if (child !== skip && child.type === "Group" && child.children.length === 0) child.removeFromParent();
+  for (const [material, list] of buckets) root.add(new THREE.Mesh(mergeGeometries(list), material));
 }
 function glowTexture() {
   const c = document.createElement("canvas");
@@ -204,6 +235,9 @@ export class Endurance {
     sternCollar.rotation.x = Math.PI / 2;
     sternCollar.position.z = 0.34;
     this.group.add(sternCollar);
+
+    mergeByMaterial(this.ring);
+    mergeByMaterial(this.group, this.ring);
 
     // Main drive glow on the stern and RCS puffs around the ring.
     const glow = glowTexture();

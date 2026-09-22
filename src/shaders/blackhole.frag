@@ -48,6 +48,15 @@ vec3 acceleration(vec3 p,float h2) {
  float r2=dot(p,p);
  return -1.5*h2*p/(r2*r2*sqrt(r2))*uLensing;
 }
+// Weak-field deflection still ahead of a straight ray from p along unit v
+// (Schwarzschild, r_s = 1): alpha = (1 - s(2s^2 + 3b^2) / (2r^3)) / b, toward the hole.
+vec3 weakBend(vec3 p, vec3 v) {
+ float s=dot(p,v);
+ vec3 c=p-s*v;
+ float b=max(length(c),1e-4), r=length(p);
+ float alpha=(1.-s*(2.*s*s+3.*b*b)/(2.*r*r*r))/b*uLensing;
+ return normalize(v-alpha*c/b);
+}
 void main() {
 #ifdef DOME
  vec3 ray=normalize(vDir);
@@ -59,10 +68,14 @@ void main() {
  float h2=dot(cross(p,velocity),cross(p,velocity));
  vec3 light=vec3(0.); float transmittance=1.;
  bool captured=false;
- for(int i=0;i<240;i++) {
+ // Rays that never come within 19 radii miss the disk and its haze entirely:
+ // bend them analytically instead of stepping (most of the sky, most of the time).
+ if(h2>361.) velocity=weakBend(p,velocity);
+ else for(int i=0;i<240;i++) {
    float r=length(p);
    if(r<1.015) {captured=true;break;}
-   if(r>max(65.,length(uCamera)+12.) && dot(p,velocity)>0.) break;
+   // Outbound beyond the haze: finish the remaining weak-field bend in closed form.
+   if(r>19. && dot(p,velocity)>0.) {velocity=weakBend(p,normalize(velocity));break;}
    float stepSize=clamp(r*.075,.022,2.8);
    vec3 a=acceleration(p,h2);
    vec3 mid=p+velocity*stepSize*.5;

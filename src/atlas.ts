@@ -4,6 +4,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import worldFragment from "./shaders/world.frag?raw";
 import blackHoleFragment from "./shaders/blackhole.frag?raw";
 import starsChunk from "./shaders/stars.glsl?raw";
@@ -294,6 +295,8 @@ export class Atlas {
   private elapsed = 0;
   private renderScale = 0.75;
   private adaptiveQuality = true;
+  private calm = 0;
+  private fxaa = new FXAAPass();
   private performanceTime = 0;
   private performanceFrames = 0;
   private fps = 60;
@@ -307,6 +310,16 @@ export class Atlas {
   private earth: THREE.Texture;
   private solarDome: THREE.Mesh;
   private blackDome: THREE.Mesh;
+  /** Gargantua's ray-traced sky, cached in a cube and refreshed one face per frame for the wormhole captures. */
+  private gargSky = new THREE.WebGLCubeRenderTarget(512, {
+    type: THREE.HalfFloatType,
+    generateMipmaps: false,
+    minFilter: THREE.LinearFilter,
+  });
+  private gargSkyCam = new THREE.CubeCamera(0.05, 10, this.gargSky);
+  private gargSkyScene = new THREE.Scene();
+  private gargSkyFace = -1;
+  private cachedDome: THREE.Mesh;
   private lens: THREE.Mesh;
   private lensMaterial: THREE.ShaderMaterial;
   private cubes: Record<"local" | "remote", { target: THREE.WebGLCubeRenderTarget; camera: THREE.CubeCamera }>;
@@ -350,11 +363,10 @@ export class Atlas {
     this.controls.enableDamping = true;
     this.controls.enablePan = false;
     this.controls.enabled = false;
-    // Multisampled HDR target: the ship's thin spokes and module edges need antialiasing.
-    this.composer = new EffectComposer(
-      renderer,
-      new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }),
-    );
+    // HDR target. Multisampling it is the best antialiasing for the ship's thin spokes,
+    // but on integrated GPUs it cost more than everything else combined, so it is kept
+    // for Cinematic quality and FXAA smooths the edges otherwise.
+    this.composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     const shipPass = new RenderPass(this.shipScene, this.shipCamera);
     shipPass.clear = false;
@@ -362,6 +374,7 @@ export class Atlas {
     this.composer.addPass(shipPass);
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.45, 1.15));
     this.composer.addPass(new OutputPass());
+    this.composer.addPass(this.fxaa);
     for (const data of worlds) this.createBody(data);
     this.addDebris("solar", 70, 79, 1400);
     this.addDebris("solar", 225, 270, 1800);
@@ -403,7 +416,24 @@ export class Atlas {
       pixelSize(blackSky)(r, s, c);
       blackSky.uniforms.uCamera.value.setFromMatrixPosition(c.matrixWorld).divideScalar(3);
     };
-    for (const dome of [this.solarDome, this.blackDome]) {
+    const traceDome = new THREE.Mesh(this.blackDome.geometry, blackSky);
+    traceDome.onBeforeRender = this.blackDome.onBeforeRender;
+    traceDome.frustumCulled = false;
+    this.gargSkyScene.add(traceDome);
+    this.cachedDome = new THREE.Mesh(
+      this.blackDome.geometry,
+      new THREE.ShaderMaterial({
+        vertexShader: domeVertex,
+        fragmentShader:
+          "uniform samplerCube uCache;varying vec3 vDir;void main(){gl_FragColor=vec4(textureCube(uCache,vDir).rgb,1.);}",
+        uniforms: { uCache: { value: this.gargSky.texture } },
+        side: THREE.BackSide,
+        depthWrite: false,
+      }),
+    );
+    this.cachedDome.visible = false;
+    this.roots.gargantua.add(this.cachedDome);
+    for (const dome of [this.solarDome, this.blackDome, this.cachedDome]) {
       dome.frustumCulled = false;
       dome.renderOrder = -100;
     }
@@ -484,7 +514,7 @@ export class Atlas {
     this.root = document.createElement("section");
     this.root.className = "atlas-ui";
     this.root.hidden = true;
-    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud" aria-hidden="true"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small>km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · drag or arrows to steer · <kbd>Q</kbd>/<kbd>E</kbd> roll · <kbd>Shift</kbd> boost · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · scroll zoom · <kbd>H</kbd> hide</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
+    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud" aria-hidden="true"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small>km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · drag or arrows to steer · <kbd>Q</kbd>/<kbd>E</kbd> roll · <kbd>Shift</kbd> boost · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
     document.body.append(this.root);
     const quality = document.createElement("select");
     quality.setAttribute("aria-label", "Atlas render quality");
@@ -493,6 +523,7 @@ export class Atlas {
     quality.onchange = () => {
       this.adaptiveQuality = quality.value === "auto";
       this.renderScale = quality.value === "high" ? 1 : quality.value === "low" ? 0.5 : 0.75;
+      this.setMultisampling(quality.value === "high");
       this.resize();
     };
     this.root.querySelector(".atlas-tools")!.prepend(quality);
@@ -597,6 +628,7 @@ export class Atlas {
         else void document.documentElement.requestFullscreen();
       }
       if (k === "c") this.cycleView();
+      if (k === "m" && !e.repeat) document.getElementById("audio")!.click();
       if (k === "g") this.goWormhole();
       const flightKeys = ["w", "a", "s", "d", "q", "e", "x", "arrowup", "arrowdown", "arrowleft", "arrowright"];
       if (flightKeys.includes(k)) {
@@ -626,6 +658,8 @@ export class Atlas {
       };
       b.onpointerup = b.onpointercancel = b.onlostpointercapture = () => this.keys.delete(b.dataset.thrust!);
     });
+    // Dev-only handle for profiling: time frames without relying on requestAnimationFrame.
+    if (import.meta.env.DEV) (window as unknown as { __atlas: Atlas }).__atlas = this;
     Object.defineProperty(window, "interstellar", {
       get: () => ({
         active: this.active,
@@ -847,6 +881,13 @@ export class Atlas {
     this.ambience?.flight(0, 0);
     document.body.classList.remove("exploring");
     this.exit();
+  }
+  private setMultisampling(on: boolean) {
+    for (const target of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+      target.samples = on ? 4 : 0;
+      target.dispose();
+    }
+    this.fxaa.enabled = !on;
   }
   resize() {
     if (this.active)
@@ -1162,13 +1203,30 @@ export class Atlas {
     }
     this.camera.quaternion.copy(worldOrient);
   }
+  /** Ray-trace one face of Gargantua's sky per call (all six the first time). */
+  private refreshGargSky(point: THREE.Vector3) {
+    const cam = this.gargSkyCam;
+    cam.position.copy(point);
+    cam.updateMatrixWorld();
+    if (this.gargSkyFace < 0) {
+      cam.update(this.renderer, this.gargSkyScene);
+      this.gargSkyFace = 0;
+      return;
+    }
+    const previous = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(this.gargSky, this.gargSkyFace);
+    this.renderer.render(this.gargSkyScene, cam.children[this.gargSkyFace] as THREE.Camera);
+    this.renderer.setRenderTarget(previous);
+    this.gargSkyFace = (this.gargSkyFace + 1) % 6;
+  }
   private captureCubes(inside: boolean, angular: number) {
-    // Our side's worlds are cheap to capture; Gargantua's sky is a full ray trace.
+    // Worlds are cheap to capture; Gargantua's ray-traced sky comes from gargSky.
     const hi = this.renderScale >= 0.95;
     const want = (side: Side) => {
       const big = inside || angular > 0.25;
-      if (side === "solar") return big ? 1024 : 512;
-      return big ? (hi ? 768 : 512) : 256;
+      if (side === "solar") return big ? (hi ? 1024 : 768) : 512;
+      // Cheap now that its sky comes from the cache, so never go below 512.
+      return big && hi ? 768 : 512;
     };
     for (const [which, side] of [["local", this.camSide], ["remote", other(this.camSide)]] as const) {
       const size = want(side);
@@ -1184,10 +1242,14 @@ export class Atlas {
       .applyMatrix3(this.bridge.mirror)
       .multiplyScalar(Math.min(dist, RZ))
       .add(this.bridge.mouths[other(this.camSide)]);
+    this.refreshGargSky(this.camSide === "gargantua" ? this.camera.position : mirrorPoint);
     const jobs: [keyof typeof this.cubes, Side, THREE.Vector3][] = [];
     // Alternate the two captures; motion near the bridge is slow enough that a frame of lag is invisible.
-    if (this.cubeFrame % 2 === 0) jobs.push(["local", this.camSide, this.camera.position]);
-    else jobs.push(["remote", other(this.camSide), mirrorPoint]);
+    // While the sphere is small on screen, refresh half as often.
+    const period = inside || angular > 0.25 ? 2 : 4;
+    const phase = this.cubeFrame % period;
+    if (phase === 0) jobs.push(["local", this.camSide, this.camera.position]);
+    else if (phase === period / 2) jobs.push(["remote", other(this.camSide), mirrorPoint]);
     const clearColor = this.renderer.getClearColor(new THREE.Color()),
       clearAlpha = this.renderer.getClearAlpha();
     this.renderer.setClearColor(0x000000, 0);
@@ -1197,11 +1259,16 @@ export class Atlas {
       this.roots.gargantua.visible = side === "gargantua";
       // Our sky is added procedurally by the lens shader, so capture only its worlds.
       this.solarDome.visible = false;
+      // Gargantua's sky comes from the cache instead of six fresh ray traces.
+      this.blackDome.visible = false;
+      this.cachedDome.visible = true;
       this.cubes[which].camera.position.copy(point);
       this.cubes[which].camera.updateMatrixWorld();
       this.cubes[which].camera.update(this.renderer, this.scene);
     }
     this.solarDome.visible = true;
+    this.blackDome.visible = true;
+    this.cachedDome.visible = false;
     this.renderer.setClearColor(clearColor, clearAlpha);
   }
   update(dt: number) {
@@ -1212,8 +1279,13 @@ export class Atlas {
       this.fps = this.performanceFrames / this.performanceTime;
       const previous = this.renderScale;
       if (this.adaptiveQuality) {
-        if (this.fps < 28) this.renderScale = Math.max(innerWidth < 700 ? 0.6 : 0.45, this.renderScale - 0.1);
-        else if (this.fps > 55) this.renderScale = Math.min(1, this.renderScale + 0.05);
+        // Aim for a steady 50+: drop quickly, climb back slowly, and only after a calm spell.
+        const floor = innerWidth < 700 ? 0.55 : 0.4;
+        if (this.fps < 30) this.renderScale = Math.max(floor, this.renderScale - 0.15);
+        else if (this.fps < 46) this.renderScale = Math.max(floor, this.renderScale - 0.05);
+        if (this.fps < 46) this.calm = 0;
+        else if (this.fps > 57 && ++this.calm >= 3) this.renderScale = Math.min(1, this.renderScale + 0.05);
+        this.renderScale = Math.round(this.renderScale * 100) / 100;
       }
       if (previous !== this.renderScale) this.resize();
       this.performanceTime = 0;

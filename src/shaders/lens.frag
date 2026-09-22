@@ -46,8 +46,9 @@ void main() {
   vec3 e2 = tl > 1e-6 ? t / tl : normalize(cross(n, abs(n.y) < .9 ? vec3(0, 1, 0) : vec3(1, 0, 0)));
   float b = r * tl, phi = 0.;
   int status = 0;
-  for (int i = 0; i < 360; i++) {
-    float h = .04 * r + .01 * uRho;
+  for (int i = 0; i < 280; i++) {
+    // Step grows with radius; the flare scale M is still resolved by ~4 steps.
+    float h = .055 * r + .012 * uRho;
     float s1 = drdl(l);
     float lm = l + p * h * .5;
     float rm = max(r + s1 * p * h * .5, uRho);

@@ -1,6 +1,12 @@
 # Project updates
 
-## 2026-09-22 21:34
+## 2026-09-22
+### 22:43
+- Fixed sound: the old mix sat below 150 Hz, which laptop speakers cannot play. New pad, wind, engine and wormhole layers sit around 100 Hz-2 kHz behind a limiter; M now toggles sound in explore mode too.
+- Faster rendering on integrated GPUs (measured on Intel UHD, 1280x720 at 0.75 scale: start 12 ms, throat 17 ms, Gargantua side 8 ms per frame; Gargantua side was ~1 fps). Replaced 4x MSAA with FXAA except on Cinematic quality, cached Gargantua's ray-traced sky for wormhole captures (one cube face per frame), analytic light bending for rays that miss the disk, merged the ship into one draw call per material, and tuned the lens step and capture rates.
+- Adaptive quality now targets 50+ fps: drops resolution quickly, climbs back only after a calm spell.
+
+### 21:34
 - Replaced the wormhole's refractive sphere and 2D tunnel cut with a per-pixel ray tracer through the Double Negative wormhole metric (James et al. 2015). The crossing is now continuous: ship and camera move in wormhole coordinates, and each side's worlds are captured into environment maps every frame.
 - Added a flyable Endurance-inspired ship (12-module spinning ring, Ranger, landers) with inertial flight, flight assist, speed limits near bodies, chase/hull/cockpit cameras, and an autopilot that uses the same physics. Starts near Saturn with the lensed wormhole ahead; arrives facing Gargantua.
 - Procedural per-pixel stars with a different sky on each side, smoother gas-giant shading (storm only on Jupiter), a Cassini division, MSAA, engine and wormhole-buffeting audio, and removed Gargantua's debris belt.
