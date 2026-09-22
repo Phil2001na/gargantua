@@ -46,7 +46,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
    <footer class="bottom"><div class="voyage-progress" id="progress"></div><div class="status-line"><div class="status" id="status">Systems ready · Awaiting departure</div><div class="hints" id="hints">Drag to look <span>·</span> Scroll to approach <span>·</span> <kbd>H</kbd> hide interface</div></div><div class="bottom-row"><div class="telemetry"><div class="metric"><div class="micro">Distance from centre</div><div class="metric-value"><span id="distance">—</span><small>AU</small></div></div><div class="metric"><div class="micro">Horizon radii</div><div class="metric-value"><span id="radius">—</span><small>Rѕ</small></div></div><div class="metric"><div class="micro">Distant / local clock</div><div class="metric-value"><span id="dilation">—</span><small>×</small></div></div><div class="metric mass"><div class="micro">Event horizon diameter</div><div class="metric-value">590.6<small>M km</small></div></div></div><div class="mode-switch" role="group" aria-label="Navigation mode"><button data-mode="voyage" aria-pressed="true">Voyage</button><button data-mode="flight" aria-pressed="false">Free flight</button><button data-mode="orbit" aria-pressed="false">Orbit</button></div><div class="transport"><button class="icon-btn" id="pause" aria-label="Pause simulation" title="Pause (Space)">${svg("pause")}</button><button class="icon-btn" id="reset" aria-label="Restart journey" title="Restart (R)">${svg("reset")}</button></div></div></footer>
  </div>
  <button class="return-hud" id="show">Show controls · H</button>
- <dialog class="info" id="info"><button class="icon-btn close" id="close-info" aria-label="Close guide">${svg("close")}</button><div class="eyebrow">Field guide</div><h2>You are very, very small.</h2><p>This black hole has the mass of 100 million suns. Its event horizon is about 591 million kilometres across: large enough to swallow Earth's orbit.</p><h3>Find your way</h3><div class="key-table"><kbd>Drag</kbd><span>Look around in flight; circle in orbit</span><kbd>W A S D</kbd><span>Fly forward, left, backward, right</span><kbd>Q / E</kbd><span>Descend / ascend</span><kbd>Shift</kbd><span>Boost flight speed</span><kbd>Scroll / pinch</kbd><span>Approach or pull back</span><kbd>Space</kbd><span>Pause time and the guided voyage</span><kbd>H / F / M</kbd><span>Hide interface / fullscreen / sound</span><kbd>R / Escape</kbd><span>Restart / close panels or show controls</span></div><p>Choose <b>Voyage</b> for a 100-second approach. <b>Free flight</b> puts you at the controls. <b>Orbit</b> lets you examine the disk from every angle. Flight keys take over from the voyage automatically. On a touch screen, use the flight buttons and drag to look.</p><h3>What you are seeing</h3><p>Light paths curve through an approximate Schwarzschild gravitational field. The disk's far side appears above and below the shadow because its light bends around the hole. Hot gas forms bright filaments; surrounding haze catches their glow. Background stars are lensed along the same light paths.</p><p>The clock ratio estimates gravitational time dilation for a stationary observer. It excludes orbital velocity and spin. Travel, disk motion, and sound are artistic choices. Flight stops outside the horizon so you can keep exploring.</p><p>Inspired by <i>Interstellar</i> and the <a href="https://arxiv.org/abs/1502.03808" target="_blank" rel="noopener noreferrer">James, von Tunzelmann, Franklin & Thorne paper</a>. Independently created; no film imagery or audio used.</p></dialog>
+ <dialog class="info" id="info"><button class="icon-btn close" id="close-info" aria-label="Close guide">${svg("close")}</button><div class="eyebrow">Field guide</div><h2>You are very, very small.</h2><p>This black hole has the mass of 100 million suns. Its event horizon is about 591 million kilometres across: large enough to swallow Earth's orbit.</p><h3>Find your way</h3><div class="key-table"><kbd>Drag / arrows</kbd><span>Look around in flight; circle in orbit</span><kbd>W A S D</kbd><span>Fly forward, left, backward, right</span><kbd>Q / E</kbd><span>Descend / ascend</span><kbd>Shift</kbd><span>Boost flight speed</span><kbd>Scroll / pinch</kbd><span>Approach or pull back</span><kbd>Space</kbd><span>Pause time and the guided voyage</span><kbd>H / F / M</kbd><span>Hide interface / fullscreen / sound</span><kbd>R / Escape</kbd><span>Restart / close panels or show controls</span></div><p>Choose <b>Voyage</b> for a 100-second approach. <b>Free flight</b> puts you at the controls. <b>Orbit</b> lets you examine the disk from every angle. Flight keys take over from the voyage automatically. On a touch screen, use the flight buttons and drag to look.</p><h3>What you are seeing</h3><p>Light paths curve through an approximate Schwarzschild gravitational field. The disk's far side appears above and below the shadow because its light bends around the hole. Hot gas forms bright filaments; surrounding haze catches their glow. Background stars are lensed along the same light paths.</p><p>The clock ratio estimates gravitational time dilation for a stationary observer. It excludes orbital velocity and spin. Travel, disk motion, and sound are artistic choices. Flight stops outside the horizon so you can keep exploring.</p><p>Inspired by <i>Interstellar</i> and the <a href="https://arxiv.org/abs/1502.03808" target="_blank" rel="noopener noreferrer">James, von Tunzelmann, Franklin & Thorne paper</a>. Independently created; no film imagery or audio used.</p></dialog>
  <div class="loading" id="loading"><div class="loading-ring"></div><p>Mapping the light</p></div><div class="toast" id="toast" role="status"></div>`;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
@@ -229,10 +229,10 @@ function setMode(next: Mode) {
   $("touch-controls").classList.toggle("visible", mode === "flight");
   $("hints").innerHTML =
     mode === "flight"
-      ? "<kbd>W A S D</kbd> fly · <kbd>Q E</kbd> vertical · <kbd>Shift</kbd> boost · Drag to look"
+      ? "<kbd>W A S D</kbd> fly · <kbd>Q E</kbd> vertical · <kbd>Shift</kbd> boost · Drag or arrows to look"
       : mode === "orbit"
-        ? "Drag to orbit · Scroll to change distance · <kbd>H</kbd> hide interface"
-        : "Drag to look · <kbd>W</kbd> take control · <kbd>Space</kbd> pause";
+        ? "Drag or arrows to orbit · Scroll to change distance · <kbd>H</kbd> hide interface"
+        : "Drag or arrows to look · <kbd>W</kbd> take control · <kbd>Space</kbd> pause";
 }
 function updatePause() {
   $("pause").innerHTML = svg(paused ? "play" : "pause");
@@ -473,9 +473,11 @@ window.addEventListener("keydown", (e) => {
   if (info.open) return;
   if ((e.target as HTMLElement).matches("input,select,textarea")) return;
   const k = e.key.toLowerCase();
-  if ([" ", "w", "a", "s", "d", "q", "e", "arrowup", "arrowdown"].includes(k))
+  if ([" ", "w", "a", "s", "d", "q", "e"].includes(k) || k.startsWith("arrow"))
     e.preventDefault();
   if (e.repeat) return;
+  // Arrow keys look around (or circle the hole in orbit) while W A S D fly.
+  if (k.startsWith("arrow")) keys.add(k);
   if ("wasdqe".includes(k) && k.length === 1) {
     if (mode !== "flight") setMode("flight");
     keys.add(k);
@@ -565,6 +567,17 @@ function updateCamera(dt: number) {
     smoothPhi = THREE.MathUtils.damp(smoothPhi, orbitPhi, 9, dt);
     smoothRadius = THREE.MathUtils.damp(smoothRadius, orbitRadius, 7, dt);
     position.setFromSphericalCoords(smoothRadius, smoothPhi, smoothTheta);
+  }
+  const lookX = Number(keys.has("arrowleft")) - Number(keys.has("arrowright")),
+    lookY = Number(keys.has("arrowup")) - Number(keys.has("arrowdown"));
+  if (lookX || lookY) {
+    if (mode === "orbit") {
+      orbitTheta += lookX * 1.2 * dt;
+      orbitPhi = THREE.MathUtils.clamp(orbitPhi - lookY * 1.2 * dt, 0.04, Math.PI - 0.04);
+    } else {
+      yaw = THREE.MathUtils.euclideanModulo(yaw + lookX * 1.5 * dt + Math.PI, Math.PI * 2) - Math.PI;
+      pitch = THREE.MathUtils.clamp(pitch + lookY * 1.5 * dt, -1.3, 1.3);
+    }
   }
   if (mode === "flight") {
     const movement = new THREE.Vector3(
@@ -690,6 +703,7 @@ Object.defineProperty(window, "gargantua", {
     time,
     position: position.toArray(),
     distance: position.length(),
+    look: [yaw, pitch],
     fps: Math.round(fpsAverage),
     resolution: uniforms.uResolution.value.toArray(),
     quality,

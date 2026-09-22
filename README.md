@@ -16,8 +16,8 @@ Open http://127.0.0.1:5177. For a production build, run `npm run build`, followe
 ## Explore
 
 - **Begin approach / Voyage:** a 100-simulation-second guided journey from 21 to roughly 7.6 horizon radii. Scene time speed also changes the voyage speed.
-- **Free flight:** drag to look; W/A/S/D to move; Q/E to descend/ascend; Shift to boost. Movement keys take over the voyage. Touch devices have equivalent buttons.
-- **Orbit:** drag to circle; scroll or pinch to adjust distance.
+- **Free flight:** drag or arrow keys to look (while flying); W/A/S/D to move; Q/E to descend/ascend; Shift to boost. Movement keys take over the voyage. Touch devices have equivalent buttons.
+- **Orbit:** drag or arrow keys to circle; scroll or pinch to adjust distance.
 - **Space:** pause disk time and voyage. Manual navigation remains available.
 - **H:** hide the interface; **F:** fullscreen; **M:** ambient sound; **R:** restart; **?:** guide; **Escape:** close panels/show interface.
 - **Scene settings:** exposure, disk glow, disk atmosphere, time speed, field of view, lensing, Doppler brightness, render quality, and four viewpoints.

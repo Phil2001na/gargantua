@@ -1,6 +1,9 @@
 # Project updates
 
 ## 2026-09-22
+### 23:08
+- Black hole observatory: arrow keys now look around in free flight and voyage (and circle the hole in orbit) while W/A/S/D fly, matching explore mode. Hints, guide and README updated.
+
 ### 22:58
 - Explore mode: arrow keys now control the camera independently of the ship (chase camera orbits the Endurance, hull/cockpit views turn your head), so you can fly and look at once, even on autopilot; V recentres, switching views resets.
 - Ship pitch moved from the arrows to R/F; atlas fullscreen moved from F to Enter.
