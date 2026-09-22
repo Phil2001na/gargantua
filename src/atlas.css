@@ -256,37 +256,62 @@
 .atlas-clean button {
   pointer-events: none;
 }
-.crossing-caption {
-  display: none;
+.world-card {
+  transition: opacity 1.2s ease;
 }
-.in-transit::after {
-  content: "";
+.card-hidden .world-card {
+  opacity: 0;
+}
+.flight-hud {
   position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse,
-    transparent 8%,
-    #7094c033 45%,
-    #d5edff 130%
-  );
-  opacity: var(--crossing);
-  mix-blend-mode: screen;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 22px;
+  text-align: right;
+  text-shadow: 0 1px 10px #000;
   pointer-events: none;
 }
-.in-transit .crossing-caption {
-  display: block;
-  position: absolute;
-  top: 47%;
-  width: 100%;
-  text-align: center;
-  font:
-    24px "Barlow Condensed",
-    sans-serif;
-  letter-spacing: 0.12em;
-  text-shadow: 0 2px 20px black;
+.flight-hud > div {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
 }
-.in-transit .world-card,
-.in-transit .world-label {
+.flight-hud strong {
+  font: 300 34px/1 "Barlow Condensed", sans-serif;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.flight-hud small {
+  font: 9px "IBM Plex Mono", monospace;
+  color: #a4afbf;
+}
+.flight-hud .throttle {
+  display: block;
+  width: 110px;
+  height: 3px;
+  background: #ccd5dd26;
+}
+.flight-hud .throttle b {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #dec49a;
+  transition: width 0.15s linear;
+}
+.atlas-hint kbd {
+  font: 9px "IBM Plex Mono", monospace;
+  border: 1px solid #ccd5dd33;
+  border-radius: 2px;
+  padding: 1px 4px;
+}
+.in-bridge {
+  background: none;
+}
+.in-bridge .world-card,
+.in-bridge .world-label,
+.in-bridge .atlas-hint {
   opacity: 0;
 }
 .atlas-launch {
@@ -367,6 +392,24 @@
   }
   .atlas-hint {
     display: none;
+  }
+  .flight-hud {
+    left: 20px;
+    right: auto;
+    top: 96px;
+    transform: none;
+    display: flex;
+    gap: 16px;
+    text-align: left;
+  }
+  .flight-hud > div {
+    justify-items: start;
+  }
+  .flight-hud strong {
+    font-size: 22px;
+  }
+  .flight-hud .throttle {
+    width: 60px;
   }
   .atlas-touch {
     display: flex;

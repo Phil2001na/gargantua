@@ -25,9 +25,9 @@ Open http://127.0.0.1:5177. For a production build, run `npm run build`, followe
 
 ## Rendering and physical scope
 
-The expanded experience connects Gargantua and our solar system through a traversable wormhole. Choose **Explore both systems** to begin. See [ATLAS.md](ATLAS.md) for destinations, controls, sources, and simulation limits.
+The expanded experience connects Gargantua and our solar system through a traversable wormhole, ray-traced from the film team's published metric. You fly an Endurance-inspired ship through it with no cut between systems. Choose **Explore both systems** to begin. See [ATLAS.md](ATLAS.md) for destinations, controls, sources, and simulation limits.
 
-The full-screen fragment shader numerically integrates curved light paths using a central inverse-fifth-power vector acceleration, `-1.5 h² p / |p|⁵`, in Schwarzschild-radius units. A midpoint integrator with adaptive spatial steps traces each pixel; crossing the equatorial plane samples a turbulent, differentially rotating accretion disk. Rays that approach the horizon are captured. Escaping rays sample a seeded celestial sphere containing 24,000 stars, a diffuse galactic band, and obscuring dust. Finite-height haze surrounds the disk. HDR bloom and ACES tone mapping produce the optical glow.
+The full-screen fragment shader numerically integrates curved light paths using a central inverse-fifth-power vector acceleration, `-1.5 h² p / |p|⁵`, in Schwarzschild-radius units. A midpoint integrator with adaptive spatial steps traces each pixel; crossing the equatorial plane samples a turbulent, differentially rotating accretion disk. Rays that approach the horizon are captured. Escaping rays sample a procedural celestial sphere: point stars are generated per pixel from the final ray direction (so they stay sharp and lens correctly) over a diffuse galactic band. Finite-height haze surrounds the disk. HDR bloom and ACES tone mapping produce the optical glow.
 
 This is an **artistic real-time approximation**, not the film's Kerr ray-bundle renderer, a full GR solver, or a gas-dynamics simulation. Finite integration steps, a thin disk, heuristic Doppler brightness, and approximate opacity trade accuracy for interactivity. The cinematic resemblance does not imply film-level numerical fidelity.
 

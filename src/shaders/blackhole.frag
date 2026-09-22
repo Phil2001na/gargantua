@@ -1,16 +1,20 @@
 precision highp float;
+// Requires shaders/stars.glsl to be prepended (provides uSky, uPix, skyColor).
+#ifdef DOME
+varying vec3 vDir;
+#else
 varying vec2 vUv;
 uniform vec2 uResolution;
-uniform vec3 uCamera;
 uniform mat3 uBasis;
 uniform float uFov;
+#endif
+uniform vec3 uCamera;
 uniform float uTime;
 uniform float uExposure;
 uniform float uDisk;
 uniform float uLensing;
 uniform float uDoppler;
 uniform float uDust;
-uniform sampler2D uSky;
 
 #define PI 3.14159265359
 float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
@@ -21,11 +25,7 @@ float noise(vec2 p) {
 float fbm(vec2 p) {
  return noise(p)*.53+noise(p*2.03)*.27+noise(p*4.07)*.13+noise(p*8.1)*.07;
 }
-vec3 sky(vec3 d) {
- d=normalize(d);
- vec2 uv=vec2(atan(d.z,d.x)/(2.*PI)+.5,asin(clamp(d.y,-1.,1.))/PI+.5);
- return texture2D(uSky,uv).rgb;
-}
+vec3 sky(vec3 d) { return skyColor(d); }
 vec3 diskColor(vec3 p, vec3 direction) {
  float r=length(p.xz);
  float phi=atan(p.z,p.x);
@@ -49,15 +49,18 @@ vec3 acceleration(vec3 p,float h2) {
  return -1.5*h2*p/(r2*r2*sqrt(r2))*uLensing;
 }
 void main() {
+#ifdef DOME
+ vec3 ray=normalize(vDir);
+#else
  vec2 screen=(vUv-.5)*2.; screen.x*=uResolution.x/uResolution.y;
  vec3 ray=normalize(uBasis*vec3(screen*tan(uFov*.5),-1.));
+#endif
  vec3 p=uCamera, velocity=ray;
  float h2=dot(cross(p,velocity),cross(p,velocity));
  vec3 light=vec3(0.); float transmittance=1.;
  bool captured=false;
- float closest=length(p);
  for(int i=0;i<240;i++) {
-   float r=length(p); closest=min(closest,r);
+   float r=length(p);
    if(r<1.015) {captured=true;break;}
    if(r>max(65.,length(uCamera)+12.) && dot(p,velocity)>0.) break;
    float stepSize=clamp(r*.075,.022,2.8);
@@ -89,7 +92,11 @@ void main() {
    p=next; velocity=nextVel;
  }
  if(!captured) light+=sky(velocity)*transmittance;
+#ifdef DOME
+ gl_FragColor=vec4(light*uExposure,1.);
+#else
  // Narrow, restrained optical bloom is applied in a separate HDR pass.
  float vignette=1.-.20*pow(length((vUv-.5)*1.25),2.);
  gl_FragColor=vec4(light*uExposure*vignette,1.);
+#endif
 }

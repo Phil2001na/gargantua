@@ -3,8 +3,9 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import fragmentShader from "./shaders/blackhole.frag?raw";
-import { createSky } from "./sky";
+import blackHoleFragment from "./shaders/blackhole.frag?raw";
+import starsChunk from "./shaders/stars.glsl?raw";
+import { createSky, skyUniforms } from "./sky";
 import { Ambience } from "./audio";
 import { Atlas } from "./atlas";
 import "./style.css";
@@ -93,13 +94,13 @@ const uniforms = {
   uLensing: { value: 1 },
   uDoppler: { value: 1 },
   uDust: { value: 1 },
-  uSky: { value: createSky() },
+  ...skyUniforms(createSky(), true),
 };
 const material = new THREE.ShaderMaterial({
   uniforms,
   vertexShader:
     "varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}",
-  fragmentShader,
+  fragmentShader: starsChunk + blackHoleFragment,
   depthTest: false,
   depthWrite: false,
 });
@@ -110,9 +111,14 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.35, 1.25);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const ambience = new Ambience();
-const atlas = new Atlas(renderer, uniforms.uSky.value, () => {
-  resize();
-});
+const atlas = new Atlas(
+  renderer,
+  uniforms.uSky.value,
+  () => {
+    resize();
+  },
+  ambience,
+);
 const atlasLaunch = document.createElement("button");
 atlasLaunch.className = "atlas-launch";
 atlasLaunch.textContent = "Explore both systems ↗";
@@ -170,6 +176,7 @@ function resize() {
   renderer.setSize(w, h, false);
   composer.setSize(w, h);
   uniforms.uResolution.value.set(w, h);
+  uniforms.uPix.value = (2 * Math.tan(uniforms.uFov.value / 2)) / h;
   viewCamera.aspect = innerWidth / innerHeight;
   viewCamera.updateProjectionMatrix();
   atlas.resize();
@@ -358,7 +365,10 @@ bindRange(
 );
 bindRange(
   "fov",
-  (v) => (uniforms.uFov.value = THREE.MathUtils.degToRad(v)),
+  (v) => {
+    uniforms.uFov.value = THREE.MathUtils.degToRad(v);
+    resize();
+  },
   (v) => v + "°",
 );
 $<HTMLInputElement>("lensing").onchange = (e) =>

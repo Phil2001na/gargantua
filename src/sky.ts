@@ -1,17 +1,14 @@
 import * as THREE from "three";
 
-// Seeded, seamless celestial sphere: the stars are fixed in world space.
+// Seeded, seamless diffuse galactic light. Point stars are procedural in the
+// shaders (see shaders/stars.glsl) so they stay sharp and lens correctly.
 export function createSky(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 4096;
-  canvas.height = 2048;
-  const ctx = canvas.getContext("2d")!;
   const w = 1024,
     h = 512,
-    small = document.createElement("canvas");
-  small.width = w;
-  small.height = h;
-  const sc = small.getContext("2d")!,
+    canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const sc = canvas.getContext("2d")!,
     pixels = sc.createImageData(w, h);
   const hash = (x: number, y: number) => {
     const a = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -53,44 +50,38 @@ export function createSky(): THREE.CanvasTexture {
         2,
       );
       const brightness =
-        band * (0.12 + cloud * 0.9) * Math.max(0.07, 1 - dust * 2.7);
+        band * (0.1 + cloud * 0.85) * Math.max(0.05, 1 - dust * 2.7);
       const purple = fbm(Math.cos(theta) * 3 + 80, Math.sin(theta) * 3 + v * 5);
       const idx = (y * w + x) * 4;
-      pixels.data[idx] = 3 + brightness * (purple > 0.52 ? 105 : 78);
-      pixels.data[idx + 1] = 4 + brightness * 77;
-      pixels.data[idx + 2] = 7 + brightness * (purple > 0.52 ? 110 : 119);
+      pixels.data[idx] = 1 + brightness * (purple > 0.52 ? 100 : 74);
+      pixels.data[idx + 1] = 2 + brightness * 72;
+      pixels.data[idx + 2] = 4 + brightness * (purple > 0.52 ? 104 : 112);
       pixels.data[idx + 3] = 255;
     }
   sc.putImageData(pixels, 0, 0);
-  ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
-  let seed = 89273;
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  for (let i = 0; i < 24000; i++) {
-    const x = rand() * canvas.width,
-      y = (Math.asin(rand() * 2 - 1) / Math.PI + 0.5) * canvas.height;
-    const lum = Math.pow(rand(), 6),
-      radius = 0.24 + lum * 1.3;
-    const tint = rand();
-    const rgb =
-      tint < 0.2 ? "164,192,255" : tint > 0.78 ? "255,217,172" : "227,231,240";
-    if (lum > 0.8) {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, radius * 5);
-      g.addColorStop(0, `rgba(${rgb},${lum * 0.42})`);
-      g.addColorStop(1, `rgba(${rgb},0)`);
-      ctx.fillStyle = g;
-      ctx.fillRect(x - radius * 5, y - radius * 5, radius * 10, radius * 10);
-    }
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${rgb},${0.23 + lum * 0.76})`;
-    ctx.fill();
-  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   return tex;
+}
+
+/** Uniforms consumed by shaders/stars.glsl. */
+export function skyUniforms(sky: THREE.Texture, gargantua: boolean) {
+  const rot = new THREE.Matrix3();
+  if (!gargantua)
+    rot.setFromMatrix4(
+      new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0.9, 2.1, 0.35)),
+    );
+  return {
+    uSky: { value: sky },
+    uPix: { value: 0.001 },
+    uSkySeed: { value: gargantua ? 1 : 0 },
+    uSkyRot: { value: rot },
+    uNebula: {
+      value: gargantua
+        ? new THREE.Color(1.15, 0.95, 0.9)
+        : new THREE.Color(0.8, 0.88, 1.1),
+    },
+  };
 }

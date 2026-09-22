@@ -1,5 +1,10 @@
 # Project updates
 
+## 2026-09-22 21:34
+- Replaced the wormhole's refractive sphere and 2D tunnel cut with a per-pixel ray tracer through the Double Negative wormhole metric (James et al. 2015). The crossing is now continuous: ship and camera move in wormhole coordinates, and each side's worlds are captured into environment maps every frame.
+- Added a flyable Endurance-inspired ship (12-module spinning ring, Ranger, landers) with inertial flight, flight assist, speed limits near bodies, chase/hull/cockpit cameras, and an autopilot that uses the same physics. Starts near Saturn with the lensed wormhole ahead; arrives facing Gargantua.
+- Procedural per-pixel stars with a different sky on each side, smoother gas-giant shading (storm only on Jupiter), a Cassini division, MSAA, engine and wormhole-buffeting audio, and removed Gargantua's debris belt.
+
 ## 2026-09-06
 ### 23:44
 - Final production build and regression checks passed, including asynchronous sound labels, image export, real pointer controls, and return to the original voyage. Recorded requirement-level evidence and performance limitations in ATLAS-VERIFICATION.md.
