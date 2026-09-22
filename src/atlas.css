@@ -1,0 +1,407 @@
+.exploring .hud,
+.exploring .return-hud {
+  display: none !important;
+}
+.atlas-ui[hidden] {
+  display: none;
+}
+.atlas-ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  color: #e7e9ed;
+  z-index: 12;
+  background: linear-gradient(
+    #070c1699,
+    transparent 20%,
+    transparent 70%,
+    #070c16dd
+  );
+}
+.atlas-ui button,
+.atlas-ui a {
+  pointer-events: auto;
+}
+.atlas-ui button,
+.route-chart button {
+  border: 1px solid #ccd5dd33;
+  background: #0b1420bf;
+  color: #e7e9ed;
+  padding: 11px 17px;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.atlas-ui button:hover,
+.route-chart button:hover {
+  border-color: #dec49a;
+  background: #28303b;
+}
+.atlas-ui button:focus-visible,
+.route-chart button:focus-visible {
+  outline: 2px solid #dec49a;
+  outline-offset: 4px;
+}
+.atlas-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30px 40px;
+}
+.atlas-top h1 {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  margin: 4px 0;
+}
+.atlas-tools {
+  display: flex;
+  gap: 10px;
+}
+.atlas-tools select{pointer-events:auto;background:#0b1420;color:#ccd5dd;border:1px solid #ccd5dd33;border-radius:3px;padding:8px;font:11px 'DM Sans',sans-serif;max-width:150px}
+.world-card {
+  position: absolute;
+  left: 40px;
+  top: 27%;
+  max-width: 285px;
+  pointer-events: none;
+  text-shadow: 0 2px 15px #000;
+}
+.world-card h2 {
+  font:
+    400 clamp(48px, 5vw, 80px)/1 "Barlow Condensed",
+    sans-serif;
+  margin: 10px 0 20px;
+}
+.world-card p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #c0c9d4;
+}
+.world-card #world-fact {
+  font:
+    10px/1.8 "IBM Plex Mono",
+    monospace;
+  color: #dec49a;
+  border-top: 1px solid #ccd5dd33;
+  padding-top: 15px;
+  margin-top: 20px;
+}
+.atlas-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.atlas-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atlas-readout strong {
+  font:
+    400 20px "Barlow Condensed",
+    sans-serif;
+}
+.atlas-readout small {
+  font-size: 10px;
+  color: #a4afbf;
+}
+.atlas-actions {
+  display: flex;
+  gap: 7px;
+}
+.atlas-actions [aria-pressed="true"] {
+  color: #dec49a;
+  border-color: #dec49a88;
+}
+.atlas-hint {
+  width: 100%;
+  font-size: 10px;
+  color: #a4afbf;
+}
+.world-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: transparent !important;
+  border: 0 !important;
+  font:
+    10px "IBM Plex Mono",
+    monospace !important;
+  text-shadow: 0 1px 5px black;
+  opacity: 0.75;
+  padding: 8px !important;
+}
+.world-label::before {
+  content: "·";
+  font-size: 24px;
+  display: block;
+}
+.world-label[hidden] {
+  display: none;
+}
+.portal-label {
+  color: #dec49a !important;
+}
+.route-chart {
+  width: min(1000px, 92vw);
+  max-height: 88dvh;
+  background: #0c1420f5;
+  color: #e7e9ed;
+  border: 1px solid #61758c66;
+  border-radius: 5px;
+  padding: 32px;
+  box-shadow: 0 20px 100px #0009;
+}
+.route-chart::backdrop {
+  background: #02050cbb;
+  backdrop-filter: blur(12px);
+}
+.route-chart header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+.route-chart h2 {
+  font:
+    400 44px "Barlow Condensed",
+    sans-serif;
+  margin: 6px 0;
+}
+.route-chart p {
+  font-size: 12px;
+  color: #a7b6c7;
+  line-height: 1.7;
+}
+.route-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+}
+.chart-art {
+  color: #adc1d7;
+  position: relative;
+}
+.chart-art svg {
+  width: 100%;
+  overflow: visible;
+}
+.chart-art > span {
+  display: block;
+  text-align: center;
+  font:
+    9px "IBM Plex Mono",
+    monospace;
+  color: #77899d;
+}
+#route-list {
+  display: grid;
+  gap: 4px;
+}
+#route-list button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  text-align: left;
+  padding: 10px 14px;
+  background: transparent;
+  border-color: #ccd5dd15;
+}
+#route-list button small {
+  grid-column: 1;
+  font-size: 10px;
+  color: #879aaf;
+  margin-top: 4px;
+}
+#route-list button > span:last-child {
+  grid-column: 2;
+  grid-row: 1/3;
+  color: #dec49a;
+}
+.route-bridge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 25px 0 12px;
+  padding: 18px 0;
+  border-top: 1px solid #ccd5dd33;
+  border-bottom: 1px solid #ccd5dd33;
+  font:
+    10px "IBM Plex Mono",
+    monospace;
+  color: #dec49a;
+}
+.route-note {
+  font-size: 10px !important;
+}
+.atlas-touch {
+  display: none;
+}
+.atlas-restore { display:none; }
+.atlas-clean > .atlas-restore { display:block; position:absolute; bottom:24px; left:24px; opacity:1; pointer-events:auto; }
+.atlas-clean > * {
+  opacity: 0;
+  pointer-events: none;
+}
+.atlas-clean button {
+  pointer-events: none;
+}
+.crossing-caption {
+  display: none;
+}
+.in-transit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse,
+    transparent 8%,
+    #7094c033 45%,
+    #d5edff 130%
+  );
+  opacity: var(--crossing);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.in-transit .crossing-caption {
+  display: block;
+  position: absolute;
+  top: 47%;
+  width: 100%;
+  text-align: center;
+  font:
+    24px "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 20px black;
+}
+.in-transit .world-card,
+.in-transit .world-label {
+  opacity: 0;
+}
+.atlas-launch {
+  position: fixed;
+  right: 40px;
+  top: 112px;
+  z-index: 9;
+  border: 1px solid #dec49a88;
+  color: #dec49a;
+  background: #0b1420aa;
+  border-radius: 3px;
+  padding: 12px 19px;
+  font:
+    12px "IBM Plex Mono",
+    monospace;
+  cursor: pointer;
+}
+.exploring .atlas-launch,
+.clean .atlas-launch {
+  display: none;
+}
+@media (max-width: 700px) {
+  .atlas-top {
+    padding: 20px;
+    align-items: start;
+    gap: 12px;
+  }
+  .atlas-top h1 {
+    font-size: 24px;
+  }
+  .atlas-top .micro {
+    font-size: 8px;
+  }
+  .atlas-tools {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .atlas-ui button {
+    padding: 9px 10px;
+    font-size: 10px;
+  }
+  .world-card {
+    left: 20px;
+    top: auto;
+    bottom: 205px;
+    max-width: 350px;
+    width: calc(100% - 40px);
+  }
+  .world-card h2 {
+    font-size: 46px;
+    margin: 6px 0 9px;
+  }
+  .world-card p {
+    font-size: 11px;
+    line-height: 1.5;
+    max-height: 65px;
+    overflow: auto;
+    pointer-events: auto;
+  }
+  .world-card #world-fact {
+    font-size: 9px;
+    padding-top: 8px;
+    margin-top: 8px;
+  }
+  .atlas-bottom {
+    padding: 16px 20px;
+    gap: 10px;
+  }
+  .atlas-readout strong {
+    font-size: 17px;
+  }
+  .atlas-readout small {
+    font-size: 8px;
+  }
+  .atlas-actions {
+    width: 100%;
+    gap: 5px;
+  }
+  .atlas-hint {
+    display: none;
+  }
+  .atlas-touch {
+    display: flex;
+    position: absolute;
+    right: 20px;
+    bottom: 125px;
+    gap: 8px;
+  }
+  .route-chart {
+    padding: 20px;
+  }
+  .route-chart h2 {
+    font-size: 32px;
+  }
+  .route-layout {
+    grid-template-columns: 1fr;
+  }
+  .chart-art {
+    display: none;
+  }
+  .route-bridge {
+    font-size: 8px;
+    flex-wrap: wrap;
+  }
+  .atlas-launch {
+    right: 20px;
+    top: 94px;
+    font-size: 10px;
+  }
+  .world-label {
+    font-size: 8px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-ui * {
+    transition: none !important;
+  }
+}
