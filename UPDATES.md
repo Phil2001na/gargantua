@@ -1,6 +1,9 @@
 # Project updates
 
 ## 2026-09-22
+### 22:58
+- Explore mode: arrow keys now control the camera independently of the ship (chase camera orbits the Endurance, hull/cockpit views turn your head), so you can fly and look at once, even on autopilot; V recentres, switching views resets.
+- Ship pitch moved from the arrows to R/F; atlas fullscreen moved from F to Enter.
 ### 22:43
 - Fixed sound: the old mix sat below 150 Hz, which laptop speakers cannot play. New pad, wind, engine and wormhole layers sit around 100 Hz-2 kHz behind a limiter; M now toggles sound in explore mode too.
 - Faster rendering on integrated GPUs (measured on Intel UHD, 1280x720 at 0.75 scale: start 12 ms, throat 17 ms, Gargantua side 8 ms per frame; Gargantua side was ~1 fps). Replaced 4x MSAA with FXAA except on Cinematic quality, cached Gargantua's ray-traced sky for wormhole captures (one cube face per frame), analytic light bending for rays that miss the disk, merged the ship into one draw call per material, and tuned the lens step and capture rates.

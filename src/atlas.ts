@@ -342,6 +342,8 @@ export class Atlas {
     thrust: 0,
   };
   private camQuat = new THREE.Quaternion();
+  /** Free look from the arrow keys, independent of the ship's attitude (radians). */
+  private look = { yaw: 0, pitch: 0 };
   private camSide: Side = "solar";
   private camZone: ZonePoint | null = null;
   private view: View = "chase";
@@ -514,7 +516,7 @@ export class Atlas {
     this.root = document.createElement("section");
     this.root.className = "atlas-ui";
     this.root.hidden = true;
-    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud" aria-hidden="true"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small>km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · drag or arrows to steer · <kbd>Q</kbd>/<kbd>E</kbd> roll · <kbd>Shift</kbd> boost · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
+    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud" aria-hidden="true"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small>km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · <kbd>R</kbd>/<kbd>F</kbd> pitch · <kbd>Q</kbd>/<kbd>E</kbd> roll · drag to steer · arrows look, <kbd>V</kbd> recentre · <kbd>Shift</kbd> boost · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
     document.body.append(this.root);
     const quality = document.createElement("select");
     quality.setAttribute("aria-label", "Atlas render quality");
@@ -621,16 +623,22 @@ export class Atlas {
         e.preventDefault();
         this.openMap();
       }
-      if (e.repeat && !"wasdqex".includes(k)) return;
+      if (e.repeat && !"wasdqerfx".includes(k) && !k.startsWith("arrow")) return;
       if (k === "h") this.root.classList.toggle("atlas-clean");
-      if (k === "f") {
+      if (k === "enter") {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void document.documentElement.requestFullscreen();
       }
       if (k === "c") this.cycleView();
       if (k === "m" && !e.repeat) document.getElementById("audio")!.click();
       if (k === "g") this.goWormhole();
-      const flightKeys = ["w", "a", "s", "d", "q", "e", "x", "arrowup", "arrowdown", "arrowleft", "arrowright"];
+      // Arrow keys look around; they never take the controls away from the autopilot.
+      if (k.startsWith("arrow")) {
+        e.preventDefault();
+        this.keys.add(k);
+      }
+      if (k === "v") this.look.yaw = this.look.pitch = 0;
+      const flightKeys = ["w", "a", "s", "d", "q", "e", "r", "f", "x"];
       if (flightKeys.includes(k)) {
         e.preventDefault();
         this.keys.add(k);
@@ -920,6 +928,7 @@ export class Atlas {
     this.setView(order[(order.indexOf(this.view) + 1) % order.length] ?? "chase");
   }
   private setView(view: View) {
+    this.look.yaw = this.look.pitch = 0;
     if (view === "orbit") {
       if (this.ship.zone || this.camZone) return;
       const b = this.body(this.selected);
@@ -1097,8 +1106,8 @@ export class Atlas {
       // Manual flight: rate commands through a damped attitude controller.
       const steerX = this.steer ? THREE.MathUtils.clamp((this.steer.x - this.steer.x0) / (0.22 * Math.min(innerWidth, innerHeight)), -1, 1) : 0;
       const steerY = this.steer ? THREE.MathUtils.clamp((this.steer.y - this.steer.y0) / (0.22 * Math.min(innerWidth, innerHeight)), -1, 1) : 0;
-      const yaw = Number(k.has("a") || k.has("arrowleft")) - Number(k.has("d") || k.has("arrowright")) - steerX;
-      const pitch = Number(k.has("arrowdown")) - Number(k.has("arrowup")) - steerY;
+      const yaw = Number(k.has("a")) - Number(k.has("d")) - steerX;
+      const pitch = Number(k.has("r")) - Number(k.has("f")) - steerY;
       const roll = Number(k.has("q")) - Number(k.has("e"));
       const target = new THREE.Vector3(pitch * 0.75, yaw * 0.75, roll * 1.1);
       s.ang.lerp(target, 1 - Math.exp(-dt * 3.2));
@@ -1167,7 +1176,17 @@ export class Atlas {
     // Portrait screens are narrow: centre the chase camera and stand further back.
     const narrow = this.view === "chase" && innerWidth < 700;
     if (narrow) offset.set(0, offset.y * 1.6, offset.z * 1.8);
-    const orient = this.camQuat.clone().multiply(narrow ? views.cockpit.tilt : v.tilt);
+    // Free look: the chase camera swings around the ship; aboard, you turn your head.
+    const k = this.keys,
+      lookRate = 1.5 * dt;
+    this.look.yaw += (Number(k.has("arrowleft")) - Number(k.has("arrowright"))) * lookRate;
+    this.look.pitch += (Number(k.has("arrowup")) - Number(k.has("arrowdown"))) * lookRate;
+    this.look.pitch = THREE.MathUtils.clamp(this.look.pitch, -1.35, 1.35);
+    if (this.view === "chase") this.look.yaw = THREE.MathUtils.euclideanModulo(this.look.yaw + Math.PI, Math.PI * 2) - Math.PI;
+    else this.look.yaw = THREE.MathUtils.clamp(this.look.yaw, -2.6, 2.6);
+    const look = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.look.pitch, this.look.yaw, 0, "YXZ"));
+    if (this.view === "chase") offset.applyQuaternion(look);
+    const orient = this.camQuat.clone().multiply(look).multiply(narrow ? views.cockpit.tilt : v.tilt);
     // Buffeting inside the bridge.
     if (this.shake > 0.001) {
       const t = performance.now() / 1000;
