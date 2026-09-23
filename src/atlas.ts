@@ -322,8 +322,8 @@ export class Atlas {
   });
   private gargSkyCam = new THREE.CubeCamera(0.05, 10, this.gargSky);
   private gargSkyScene = new THREE.Scene();
+  private gargCacheScene = new THREE.Scene();
   private gargSkyFace = -1;
-  private cachedDome: THREE.Mesh;
   private lens: THREE.Mesh;
   private lensMaterial: THREE.ShaderMaterial;
   private cubes: Record<"local" | "remote", { target: THREE.WebGLCubeRenderTarget; camera: THREE.CubeCamera }>;
@@ -432,20 +432,15 @@ export class Atlas {
     traceDome.onBeforeRender = this.blackDome.onBeforeRender;
     traceDome.frustumCulled = false;
     this.gargSkyScene.add(traceDome);
-    this.cachedDome = new THREE.Mesh(
-      this.blackDome.geometry,
-      new THREE.ShaderMaterial({
-        vertexShader: domeVertex,
-        fragmentShader:
-          "uniform samplerCube uCache;varying vec3 vDir;void main(){gl_FragColor=vec4(textureCube(uCache,vDir).rgb,1.);}",
-        uniforms: { uCache: { value: this.gargSky.texture } },
-        side: THREE.BackSide,
-        depthWrite: false,
-      }),
-    );
-    this.cachedDome.visible = false;
-    this.roots.gargantua.add(this.cachedDome);
-    for (const dome of [this.solarDome, this.blackDome, this.cachedDome]) {
+    // The wormhole's copy leaves most point stars to the lens shader (see blackhole.frag).
+    const cacheSky = blackSky.clone();
+    cacheSky.defines = { CACHE: "" };
+    cacheSky.uniforms = blackSky.uniforms;
+    const cacheDome = new THREE.Mesh(this.blackDome.geometry, cacheSky);
+    cacheDome.onBeforeRender = this.blackDome.onBeforeRender;
+    cacheDome.frustumCulled = false;
+    this.gargCacheScene.add(cacheDome);
+    for (const dome of [this.solarDome, this.blackDome]) {
       dome.frustumCulled = false;
       dome.renderOrder = -100;
     }
@@ -477,6 +472,8 @@ export class Atlas {
         uCamR: { value: RZ },
         uLocal: { value: this.cubes.local.target.texture },
         uRemote: { value: this.cubes.remote.target.texture },
+        uGargSky: { value: this.gargSky.texture },
+        uGargCam: { value: new THREE.Vector3(0, 0, 30) },
         uLocalSolar: { value: 1 },
         uRemoteSolar: { value: 0 },
         uMirror: { value: this.bridge.mirror },
@@ -1366,14 +1363,16 @@ export class Atlas {
     const cam = this.gargSkyCam;
     cam.position.copy(point);
     cam.updateMatrixWorld();
+    // Gargantua's frame is centred on the hole, in units of its Schwarzschild radius.
+    this.lensMaterial.uniforms.uGargCam.value.copy(point).divideScalar(3);
     if (this.gargSkyFace < 0) {
-      cam.update(this.renderer, this.gargSkyScene);
+      cam.update(this.renderer, this.gargCacheScene);
       this.gargSkyFace = 0;
       return;
     }
     const previous = this.renderer.getRenderTarget();
     this.renderer.setRenderTarget(this.gargSky, this.gargSkyFace);
-    this.renderer.render(this.gargSkyScene, cam.children[this.gargSkyFace] as THREE.Camera);
+    this.renderer.render(this.gargCacheScene, cam.children[this.gargSkyFace] as THREE.Camera);
     this.renderer.setRenderTarget(previous);
     this.gargSkyFace = (this.gargSkyFace + 1) % 6;
   }
@@ -1415,18 +1414,15 @@ export class Atlas {
     for (const [which, side, point] of jobs) {
       this.roots.solar.visible = side === "solar";
       this.roots.gargantua.visible = side === "gargantua";
-      // Our sky is added procedurally by the lens shader, so capture only its worlds.
+      // Capture only the worlds: the lens shader adds both skies itself.
       this.solarDome.visible = false;
-      // Gargantua's sky comes from the cache instead of six fresh ray traces.
       this.blackDome.visible = false;
-      this.cachedDome.visible = true;
       this.cubes[which].camera.position.copy(point);
       this.cubes[which].camera.updateMatrixWorld();
       this.cubes[which].camera.update(this.renderer, this.scene);
     }
     this.solarDome.visible = true;
     this.blackDome.visible = true;
-    this.cachedDome.visible = false;
     this.renderer.setClearColor(clearColor, clearAlpha);
   }
   update(dt: number) {

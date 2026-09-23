@@ -1,6 +1,10 @@
 # Project updates
 
 ## 2026-09-23
+### 21:24
+- Fixed the dark, misty sky around the wormhole mouth on Gargantua's side: its sky was a low-res cube copied twice, then magnified by the lens. The lens now takes only the diffuse glow from the cache and draws Gargantua's stars itself at screen resolution (weak-field bend).
+- Lensed stars stay pixel-sharp points: sized in screen space through the local lens map, so magnified stars brighten instead of smearing into arcs, and squeezed ones dim. Lens output is NaN-guarded so a bad pixel can't blank the frame through the bloom.
+
 ### 20:41
 - Rolled back all code to the originally published version (d7cf345): original wormhole metric and transit, original ship scale, planets and stars. The 17:03 and 20:17 changes below are reverted.
 
