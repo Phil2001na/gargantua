@@ -1,5 +1,11 @@
 # Project updates
 
+## 2026-09-23
+### 01:58
+- Ship at a truer scale: the Endurance is about 9x smaller, so worlds and the wormhole dwarf it. Boost is now adjustable (x2 to x250, default x10) with [ / ] or HUD buttons.
+- Landing on Miller and Mann: dive into the atmosphere, press L, or use "Land on ..." in the route chart. The Ranger flies true-scale areas: Miller's shallow ocean with 1+ km tidal waves that lift you, plus an Earth-time clock; Mann's ice ridges under frozen clouds. Gargantua is ray-traced into both skies. Climb above 16 km or press L to return to orbit.
+- Accretion disk is now a 3D volume: a flared, billowing slab with dust lanes and hot debris clumps, traced for emission and absorption (about +4 ms per frame in the observatory on Intel UHD).
+
 ## 2026-09-22
 ### 23:08
 - Black hole observatory: arrow keys now look around in free flight and voyage (and circle the hole in orbit) while W/A/S/D fly, matching explore mode. Hints, guide and README updated.

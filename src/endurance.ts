@@ -7,7 +7,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
  * and two landers at the stern. Built in "ring units" (ring radius = 1) and
  * scaled by the caller. Forward is −Z; the ring spins about Z.
  */
-function panelTexture(base: string, line: string, seed: number) {
+export function panelTexture(base: string, line: string, seed: number) {
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const g = c.getContext("2d")!;
@@ -284,4 +284,113 @@ export class Endurance {
       m.opacity = THREE.MathUtils.damp(m.opacity, (turn + Math.max(0, -thrust)) * 0.7 * flicker, 14, dt);
     }
   }
+}
+
+/**
+ * The Ranger at true size, in metres: a flat lifting body about 22 m long that
+ * flies down to the surfaces while the Endurance stays in orbit. Forward is −Z.
+ */
+export function buildRanger() {
+  const group = new THREE.Group();
+  const hull = new THREE.MeshStandardMaterial({
+    map: panelTexture("#d3d5d8", "rgba(30,34,40,.4)", 47),
+    roughness: 0.55,
+    metalness: 0.25,
+  });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x24282d, roughness: 0.45, metalness: 0.5 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x0c0f13,
+    roughness: 0.15,
+    metalness: 0.8,
+    emissive: new THREE.Color(0.35, 0.3, 0.22),
+    emissiveIntensity: 0.25,
+  });
+  // Planform: a blunt nose widening to broad shoulders, drawn in (x, z).
+  const plan = new THREE.Shape();
+  plan.moveTo(0, -11);
+  plan.bezierCurveTo(2.2, -11, 3.4, -7, 4.6, -2);
+  plan.lineTo(7, 5.5);
+  plan.lineTo(6.2, 9);
+  plan.lineTo(-6.2, 9);
+  plan.lineTo(-7, 5.5);
+  plan.lineTo(-4.6, -2);
+  plan.bezierCurveTo(-3.4, -7, -2.2, -11, 0, -11);
+  const bodyGeo = new THREE.ExtrudeGeometry(plan, {
+    depth: 0.9,
+    bevelEnabled: true,
+    bevelSize: 0.9,
+    bevelThickness: 0.9,
+    bevelSegments: 4,
+    curveSegments: 20,
+  });
+  bodyGeo.rotateX(Math.PI / 2);
+  bodyGeo.translate(0, 0.45, 0);
+  // Wedge it: a thin knife-edge nose rising to a deep stern, flat underneath.
+  {
+    const p = bodyGeo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      const z = p.getZ(i),
+        y = p.getY(i),
+        t = THREE.MathUtils.clamp((z + 11) / 17, 0, 1);
+      p.setY(i, y > 0 ? y * (0.3 + 0.9 * t) : y * (0.5 + 0.4 * t));
+    }
+  }
+  bodyGeo.computeVertexNormals();
+  group.add(new THREE.Mesh(bodyGeo, hull));
+  // Raised spine and cockpit.
+  const spine = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2.1, 12, 6, 1), hull);
+  spine.rotation.x = Math.PI / 2;
+  spine.scale.set(1, 1, 0.55);
+  spine.position.set(0, 1.9, 2.5);
+  group.add(spine);
+  const canopy = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.7, 4.2, 6, 1), glass);
+  canopy.rotation.x = Math.PI / 2 - 0.12;
+  canopy.scale.set(1, 1, 0.45);
+  canopy.position.set(0, 1.45, -4.6);
+  group.add(canopy);
+  // Engines and tail fins.
+  for (const x of [-3.3, 3.3]) {
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.15, 4.5, 16), hull);
+    pod.rotation.x = Math.PI / 2;
+    pod.position.set(x, 1.2, 8);
+    group.add(pod);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 0.8, 0.9, 16, 1, true), dark);
+    nozzle.rotation.x = Math.PI / 2;
+    nozzle.position.set(x, 1.2, 10.6);
+    group.add(nozzle);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.6, 3.2), hull);
+    fin.position.set(x * 1.75, 2.1, 7.4);
+    fin.rotation.z = -Math.sign(x) * 0.35;
+    group.add(fin);
+  }
+  mergeByMaterial(group);
+  const glow = glowTexture();
+  const engines: THREE.Sprite[] = [];
+  for (const x of [-3.3, 3.3]) {
+    const s = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glow,
+        color: new THREE.Color(2.2, 2.6, 4),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0,
+      }),
+    );
+    s.position.set(x, 1.2, 11.4);
+    s.scale.setScalar(3);
+    engines.push(s);
+    group.add(s);
+  }
+  return {
+    group,
+    update(dt: number, thrust: number, time: number) {
+      const flicker = 0.85 + 0.15 * Math.sin(time * 53) * Math.sin(time * 31);
+      for (const s of engines) {
+        const m = s.material as THREE.SpriteMaterial;
+        m.opacity = THREE.MathUtils.damp(m.opacity, Math.max(0, thrust) * flicker, 10, dt);
+        s.scale.setScalar(2 + 4 * m.opacity);
+      }
+    },
+  };
 }

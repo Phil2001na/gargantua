@@ -448,3 +448,25 @@
     transition: none !important;
   }
 }
+.flight-hud .boost-cell { pointer-events: auto; }
+.flight-hud .boost-row { display: flex; align-items: center; gap: 8px; }
+.flight-hud .boost-row button {
+  width: 22px; height: 22px; padding: 0; border: 1px solid #ccd5dd40; border-radius: 3px;
+  background: #0008; color: #ccd5dd; font: 14px/1 "IBM Plex Mono", monospace; cursor: pointer;
+}
+.flight-hud .boost-row button:hover { border-color: #dec49a; color: #dec49a; }
+.atlas-fade {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.on-surface .portal-label {
+  display: none;
+}
+.route-land {
+  opacity: 0.85;
+}
+.route-land span:first-child {
+  padding-left: 14px;
+}

@@ -26,23 +26,40 @@ float fbm(vec2 p) {
  return noise(p)*.53+noise(p*2.03)*.27+noise(p*4.07)*.13+noise(p*8.1)*.07;
 }
 vec3 sky(vec3 d) { return skyColor(d); }
-vec3 diskColor(vec3 p, vec3 direction) {
- float r=length(p.xz);
- float phi=atan(p.z,p.x);
+float diskHalf(float r) { return .026+.0075*max(r-2.85,0.); }
+// Volume of the disk at q: rgb = light emitted per unit optical depth, a = extinction.
+// Bright billowing gas, darker dust lanes and hot clumps of debris.
+vec4 diskMedium(vec3 q, vec3 direction) {
+ float r=length(q.xz);
+ if(r<2.7 || r>16.) return vec4(0.);
+ float phi=atan(q.z,q.x);
  float swirl=phi-uTime*.22/pow(r/3.,1.5);
- vec2 q=vec2(cos(swirl),sin(swirl))*r*2.2;
- float turbulence=fbm(q+vec2(fbm(q*.5)*2.5,r*.7));
- float filaments=pow(.5+.5*sin(r*34.+turbulence*18.+swirl*2.),3.)*(.3+.7*noise(q*3.));
+ vec2 Q=vec2(cos(swirl),sin(swirl))*r*2.2;
+ float H=diskHalf(r);
+ // The surface billows: local thickness varies with the turbulence.
+ float billow=noise(Q*.55+vec2(q.y*3.,0.));
+ float puff=H*(.5+1.3*billow*billow);
+ float y=q.y/puff;
+ float profile=exp(-y*y*1.6);
+ if(profile<.02) return vec4(0.);
+ float turbulence=fbm(Q+vec2(noise(Q*.5+q.y*4.)*2.5,r*.7));
+ float filaments=pow(.5+.5*sin(r*34.+turbulence*18.+swirl*2.),3.)*(.3+.7*noise(Q*3.+q.y*9.));
  float fine=pow(.5+.5*sin(r*83.+swirl*7.+turbulence*16.),6.);
- float edge=smoothstep(2.85,3.3,r)*(1.-smoothstep(9.,15.,r));
+ float dust=smoothstep(.5,.78,noise(Q*1.35+vec2(turbulence*2.,q.y*6.)))*smoothstep(3.6,5.5,r);
+ float knots=pow(noise(Q*5.5-vec2(q.y*14.)),9.)*4.;
+ float edge=smoothstep(2.85,3.3,r)*(1.-smoothstep(9.,15.5,r));
  float heat=pow(3./max(r,3.),1.9);
- float structure=(.30+turbulence*.95+filaments*.8+fine*.18);
+ float structure=(.30+turbulence*.95+filaments*.8+fine*.18+knots);
  vec3 warm=mix(vec3(1.,.24,.035),vec3(1.,.73,.35),smoothstep(.05,.7,heat));
  warm=mix(warm,vec3(1.,.94,.80),pow(heat,2.)*.65);
- vec3 tangent=normalize(vec3(-p.z,0.,p.x));
+ // Gas away from the midplane is cooler and redder.
+ warm*=mix(vec3(1.),vec3(1.,.55,.3),smoothstep(.3,1.2,abs(y)));
+ vec3 tangent=normalize(vec3(-q.z,0.,q.x));
  float shift=dot(tangent,-normalize(direction));
  float beaming=mix(1.,pow(1.+shift*.40,3.),uDoppler);
- return warm*heat*structure*edge*beaming*2.6*uDisk;
+ vec3 source=warm*heat*structure*beaming*2.75*uDisk*(1.-.82*dust)*edge/.94;
+ float density=profile*edge*edge*(.55+.9*turbulence)*(1.+2.2*dust*uDust)*min(uDisk,1.);
+ return vec4(source,density*2.2/H);
 }
 vec3 acceleration(vec3 p,float h2) {
  float r2=dot(p,p);
@@ -81,13 +98,29 @@ void main() {
    vec3 mid=p+velocity*stepSize*.5;
    vec3 next=p+velocity*stepSize+a*stepSize*stepSize*.5;
    vec3 nextVel=velocity+acceleration(mid,h2)*stepSize;
-   if(p.y*next.y<=0. && abs(p.y-next.y)>.000001) {
-     vec3 hit=mix(p,next,clamp(p.y/(p.y-next.y),0.,1.));
-     float radius=length(hit.xz);
-     if(radius>2.85 && radius<15.) {
-       vec3 emission=diskColor(hit,velocity);
-       light+=emission*transmittance;
-       transmittance*=1.-.88*smoothstep(2.85,3.4,radius)*(1.-smoothstep(10.,15.,radius))*min(uDisk,1.);
+   // The disk is a flared, turbulent slab: integrate emission and absorption through
+   // it wherever this step passes within reach of the midplane.
+   float reach=max(diskHalf(max(length(p.xz),length(next.xz)))*1.9,.02);
+   if((p.y*next.y<=0. || min(abs(p.y),abs(next.y))<reach) && transmittance>.01) {
+     float dy=next.y-p.y, ta=0., tb=1.;
+     if(abs(dy)>1e-6) {
+       float t1=(-reach-p.y)/dy, t2=(reach-p.y)/dy;
+       ta=clamp(min(t1,t2),0.,1.); tb=clamp(max(t1,t2),0.,1.);
+     }
+     float span=(tb-ta)*stepSize;
+     if(span>1e-5) {
+       float jitter=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))));
+       float samples=clamp(ceil(span/max(reach*.35,.01)),2.,7.);
+       float ds=span/samples;
+       for(int k=0;k<7;k++) {
+         if(float(k)>=samples) break;
+         vec3 q=mix(p,next,ta+(tb-ta)*(float(k)+jitter)/samples);
+         vec4 m=diskMedium(q,velocity);
+         if(m.a<=0.) continue;
+         float absorb=1.-exp(-m.a*ds);
+         light+=m.rgb*absorb*transmittance;
+         transmittance*=1.-absorb;
+       }
      }
    }
    // A finite atmosphere above the disk catches light in wisps and haze.

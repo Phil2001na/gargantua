@@ -110,6 +110,8 @@ composer.addPass(new RenderPass(scene, renderCamera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.35, 1.25);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
+// Dev-only handle for profiling the observatory without requestAnimationFrame.
+if (import.meta.env.DEV) Object.assign(window, { __obs: { composer, renderer, uniforms } });
 const ambience = new Ambience();
 const atlas = new Atlas(
   renderer,
