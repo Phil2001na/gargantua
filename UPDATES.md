@@ -1,6 +1,9 @@
 # Project updates
 
 ## 2026-09-23
+### 20:41
+- Rolled back all code to the originally published version (d7cf345): original wormhole metric and transit, original ship scale, planets and stars. The 17:03 and 20:17 changes below are reverted.
+
 ### 20:17
 - Wormhole transit back to pure ray-traced optics: removed letterbox bars, radial smear, FOV change and extra bloom; the HUD now fades out fully during the passage. Long throat kept.
 - Stars no longer vanish in the throat: lensed stars scale to each pixel's sky footprint, and Gargantua's stars seen through the wormhole are drawn per pixel (weak-field bend) instead of from a blurry cube map.

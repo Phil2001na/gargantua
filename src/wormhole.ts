@@ -18,13 +18,10 @@ import * as THREE from "three";
  * v → M (I − 2nnᵀ) v, a proper rotation, so orientation stays right-handed.
  */
 export const RHO = 2.5;
-// A long throat (2a = 3ρ): from inside you see the far sky as a shrinking disc
-// ahead, ringed by repeated images of the walls. The flare beyond it is unchanged,
-// so the sphere looks the same from outside apart from a smaller far-side image.
-export const A = 1.5 * RHO;
+export const A = 0.7 * RHO;
 export const LENS_M = 0.22 * RHO;
-export const L1 = A + 1.9 * RHO;
-export const L2 = A + 4.8 * RHO;
+export const L1 = 2.6 * RHO;
+export const L2 = 5.5 * RHO;
 
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));

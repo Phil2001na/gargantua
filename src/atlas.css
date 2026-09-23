@@ -309,21 +309,6 @@
 .in-bridge {
   background: none;
 }
-/* Bridge transit: the instruments fade away and leave only the view. */
-.atlas-top,
-.flight-hud,
-.atlas-bottom,
-.world-card,
-#world-labels {
-  transition: opacity 1.6s ease;
-}
-.cine > :not(.atlas-restore):not(.atlas-fade) {
-  opacity: 0;
-  pointer-events: none;
-}
-.cine button {
-  pointer-events: none;
-}
 .in-bridge .world-card,
 .in-bridge .world-label,
 .in-bridge .atlas-hint {
@@ -470,13 +455,6 @@
   background: #0008; color: #ccd5dd; font: 14px/1 "IBM Plex Mono", monospace; cursor: pointer;
 }
 .flight-hud .boost-row button:hover { border-color: #dec49a; color: #dec49a; }
-.flight-hud .boost-row input {
-  width: 5.2ch; padding: 0; border: 0; border-bottom: 1px dashed #ccd5dd40; background: none; color: inherit;
-  font: 300 34px/1 "Barlow Condensed", sans-serif; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
-  text-align: center; outline: none;
-}
-.flight-hud .boost-row input:focus { border-bottom-color: #dec49a; color: #dec49a; }
-@media (max-width: 700px) { .flight-hud .boost-row input { font-size: 22px; } }
 .atlas-fade {
   position: absolute;
   inset: 0;
