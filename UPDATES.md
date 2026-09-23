@@ -1,6 +1,11 @@
 # Project updates
 
 ## 2026-09-23
+### 20:17
+- Wormhole transit back to pure ray-traced optics: removed letterbox bars, radial smear, FOV change and extra bloom; the HUD now fades out fully during the passage. Long throat kept.
+- Stars no longer vanish in the throat: lensed stars scale to each pixel's sky footprint, and Gargantua's stars seen through the wormhole are drawn per pixel (weak-field bend) instead of from a blurry cube map.
+- Ship at true scale (64 m Endurance vs ~6,400 km Earth); boost is now typeable up to ×10,000 with speed shown in c when fast. Planets get pixel-adaptive detail: craters and relief on rocky worlds, Mars caps, turbulent gas-giant bands, Neptune's storm and cirrus, Earth city lights, ice/ocean/desert detail, sunspots.
+
 ### 17:03
 - Longer, more cinematic wormhole transit: the throat is twice as long (2a = 3ρ, flare unchanged so the outside view is the same), traced exactly with an analytic jump through the cylinder, and the passage takes ~20 s with ~9 s gliding through the tunnel of ring images.
 - Cinematic layer on the real optics: letterbox bars and dimmed HUD, a slow barrel roll levelled on the far side, FOV breathing, subtle radial smear/fringe/vignette and extra bloom. Buffeting now follows the curvature (peaks where the flare meets the throat, eerie calm inside), with phase readouts: entering, inside the throat, emerging.

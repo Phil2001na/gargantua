@@ -137,9 +137,18 @@ void main() {
    }
    p=next; velocity=nextVel;
  }
+ float alpha=1.;
+#ifdef CACHE
+ alpha=0.;
+ // Cached for the wormhole: outside about six radii the weak-field bend places stars well
+ // enough, so leave them out and put their visibility in alpha; the reader draws them
+ // sharp at its own pixel size.
+ if(!captured && h2>36.) {light+=skyBand(velocity)*transmittance; alpha=transmittance;}
+ else
+#endif
  if(!captured) light+=sky(velocity)*transmittance;
 #ifdef DOME
- gl_FragColor=vec4(light*uExposure,1.);
+ gl_FragColor=vec4(light*uExposure,alpha);
 #else
  // Narrow, restrained optical bloom is applied in a separate HDR pass.
  float vignette=1.-.20*pow(length((vUv-.5)*1.25),2.);

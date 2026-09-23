@@ -309,39 +309,20 @@
 .in-bridge {
   background: none;
 }
-/* Bridge transit: letterbox bars slide in and the instruments step back. */
-.letterbox::before,
-.letterbox::after {
-  content: "";
-  position: fixed;
-  left: 0;
-  right: 0;
-  height: 0;
-  background: #000;
-  transition: height 1.8s cubic-bezier(0.6, 0, 0.2, 1);
-}
-.letterbox::before {
-  top: 0;
-}
-.letterbox::after {
-  bottom: 0;
-}
-.cine .letterbox::before,
-.cine .letterbox::after {
-  height: min(12vh, max(0px, calc((100vh - 100vw / 2.39) / 2)));
-}
+/* Bridge transit: the instruments fade away and leave only the view. */
 .atlas-top,
 .flight-hud,
-.atlas-actions {
-  transition: opacity 1.2s ease;
+.atlas-bottom,
+.world-card,
+#world-labels {
+  transition: opacity 1.6s ease;
 }
-.cine:not(.atlas-clean) .atlas-top,
-.cine:not(.atlas-clean) .flight-hud,
-.cine:not(.atlas-clean) .atlas-actions {
-  opacity: 0.3;
+.cine > :not(.atlas-restore):not(.atlas-fade) {
+  opacity: 0;
+  pointer-events: none;
 }
-.atlas-clean > .letterbox {
-  opacity: 1;
+.cine button {
+  pointer-events: none;
 }
 .in-bridge .world-card,
 .in-bridge .world-label,
@@ -489,6 +470,13 @@
   background: #0008; color: #ccd5dd; font: 14px/1 "IBM Plex Mono", monospace; cursor: pointer;
 }
 .flight-hud .boost-row button:hover { border-color: #dec49a; color: #dec49a; }
+.flight-hud .boost-row input {
+  width: 5.2ch; padding: 0; border: 0; border-bottom: 1px dashed #ccd5dd40; background: none; color: inherit;
+  font: 300 34px/1 "Barlow Condensed", sans-serif; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  text-align: center; outline: none;
+}
+.flight-hud .boost-row input:focus { border-bottom-color: #dec49a; color: #dec49a; }
+@media (max-width: 700px) { .flight-hud .boost-row input { font-size: 22px; } }
 .atlas-fade {
   position: absolute;
   inset: 0;

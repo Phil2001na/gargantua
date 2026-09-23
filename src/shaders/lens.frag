@@ -13,6 +13,8 @@ uniform float uCamL;
 uniform float uCamR;
 uniform samplerCube uLocal;
 uniform samplerCube uRemote;
+uniform samplerCube uGargSky;
+uniform vec3 uGargCam;
 uniform float uLocalSolar;
 uniform float uRemoteSolar;
 uniform mat3 uMirror;
@@ -30,9 +32,26 @@ float drdl(float l) {
   float d = (2. / PI) * atan(x);
   return sign(l) * mix(d, 1., smoothstep(uL1, uL2, L));
 }
+// Captured worlds over the sky: ours is procedural, Gargantua's comes from its own
+// ray-traced cache (sampled directly, so its stars are not resampled twice).
+// Gargantua's weak-field bend for rays that pass clear of it (as in blackhole.frag).
+vec3 weakBend(vec3 p, vec3 v) {
+  float s = dot(p, v);
+  vec3 c = p - s * v;
+  float b = max(length(c), 1e-4), r = length(p);
+  float alpha = (1. - s * (2. * s * s + 3. * b * b) / (2. * r * r * r)) / b;
+  return normalize(v - alpha * c / b);
+}
 vec3 environment(samplerCube map, float solar, vec3 dir) {
   vec4 o = textureCube(map, dir);
-  return solar > .5 ? o.rgb + skyColor(dir) * (1. - o.a) : o.rgb;
+  vec3 sky;
+  if (solar > .5) sky = skyColor(dir);
+  else {
+    vec4 g = textureCube(uGargSky, dir);
+    vec3 bent = weakBend(uGargCam, dir);
+    sky = g.rgb + g.a * st_stars(bent, 1., st_band(bent));
+  }
+  return o.rgb + sky * (1. - o.a);
 }
 void main() {
   vec3 d = normalize(vWorld - cameraPosition);
@@ -69,10 +88,12 @@ void main() {
     phi += b / (rm * rm) * h;
     if (abs(l) >= uL2 && p * l > 0.) { status = l > 0. ? 1 : 2; break; }
   }
-  if (status == 0) { gl_FragColor = vec4(0., 0., 0., 1.); return; }
   vec3 er = cos(phi) * n + sin(phi) * e2;
   vec3 ephi = -sin(phi) * n + cos(phi) * e2;
   vec3 v = normalize(p * er + (b / r) * ephi);
+  // How much sky each pixel sees after lensing; capped so seams between images stay sharp.
+  st_footprint = min(length(fwidth(v)), uPix * 6.);
+  if (status == 0) { gl_FragColor = vec4(0., 0., 0., 1.); return; }
   if (status == 1) {
     // Back on this side. Nearly straight rays let the ordinary 3D scene show through.
     float bend = acos(clamp(dot(d, v), -1., 1.));
