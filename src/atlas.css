@@ -309,6 +309,40 @@
 .in-bridge {
   background: none;
 }
+/* Bridge transit: letterbox bars slide in and the instruments step back. */
+.letterbox::before,
+.letterbox::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #000;
+  transition: height 1.8s cubic-bezier(0.6, 0, 0.2, 1);
+}
+.letterbox::before {
+  top: 0;
+}
+.letterbox::after {
+  bottom: 0;
+}
+.cine .letterbox::before,
+.cine .letterbox::after {
+  height: min(12vh, max(0px, calc((100vh - 100vw / 2.39) / 2)));
+}
+.atlas-top,
+.flight-hud,
+.atlas-actions {
+  transition: opacity 1.2s ease;
+}
+.cine:not(.atlas-clean) .atlas-top,
+.cine:not(.atlas-clean) .flight-hud,
+.cine:not(.atlas-clean) .atlas-actions {
+  opacity: 0.3;
+}
+.atlas-clean > .letterbox {
+  opacity: 1;
+}
 .in-bridge .world-card,
 .in-bridge .world-label,
 .in-bridge .atlas-hint {

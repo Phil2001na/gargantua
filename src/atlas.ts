@@ -5,6 +5,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import worldFragment from "./shaders/world.frag?raw";
 import blackHoleFragment from "./shaders/blackhole.frag?raw";
 import starsChunk from "./shaders/stars.glsl?raw";
@@ -27,6 +28,32 @@ import { Surface, type SurfaceId } from "./surface";
 import { skyUniforms } from "./sky";
 import type { Ambience } from "./audio";
 import "./atlas.css";
+
+/**
+ * Camera-side treatment for the bridge transit: a radial smear toward the heading,
+ * a touch of lens fringing and vignette. The light itself is still the ray tracer's.
+ */
+const TransitShader = {
+  uniforms: { tDiffuse: { value: null as THREE.Texture | null }, uAmount: { value: 0 }, uAspect: { value: 1 } },
+  vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+  fragmentShader: `uniform sampler2D tDiffuse;uniform float uAmount;uniform float uAspect;varying vec2 vUv;
+void main(){
+  vec2 c=vUv-.5;
+  float d=length(c*vec2(uAspect,1.));
+  vec3 acc=vec3(0.);float w=0.;
+  for(int i=0;i<10;i++){
+    float k=float(i)/9.;
+    float s=1.-uAmount*.045*d*k;
+    float f=uAmount*.006*d;
+    float wi=1.-.6*k;
+    acc+=wi*vec3(texture2D(tDiffuse,.5+c*s*(1.+f)).r,texture2D(tDiffuse,.5+c*s).g,texture2D(tDiffuse,.5+c*s*(1.-f)).b);
+    w+=wi;
+  }
+  vec3 col=acc/w;
+  col*=1.-uAmount*.38*smoothstep(.35,.95,d);
+  gl_FragColor=vec4(col,1.);
+}`,
+};
 
 type Sector = Side;
 type World = {
@@ -355,6 +382,10 @@ export class Atlas {
   private autopilot: Autopilot = null;
   private cardTimer = 0;
   private shake = 0;
+  /** 0..1: how deep into the cinematic bridge transit we are. */
+  private transit = 0;
+  private bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.45, 1.15);
+  private transitPass = new ShaderPass(TransitShader);
   private crossings = 0;
   /** True-scale landing sites on Miller and Mann. */
   private surface: Surface;
@@ -384,7 +415,9 @@ export class Atlas {
     shipPass.clear = false;
     shipPass.clearDepth = true;
     this.composer.addPass(shipPass);
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.45, 1.15));
+    this.composer.addPass(this.bloom);
+    this.transitPass.enabled = false;
+    this.composer.addPass(this.transitPass);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.fxaa);
     for (const data of worlds) this.createBody(data);
@@ -527,7 +560,7 @@ export class Atlas {
     this.root = document.createElement("section");
     this.root.className = "atlas-ui";
     this.root.hidden = true;
-    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small id="hud-speed-unit">km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div class="boost-cell"><span class="micro">Boost <kbd>Shift</kbd></span><span class="boost-row"><button id="boost-down" aria-label="Less boost">−</button><strong id="hud-boost">×10</strong><button id="boost-up" aria-label="More boost">+</button></span></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-land" hidden>Land</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · <kbd>R</kbd>/<kbd>F</kbd> pitch · <kbd>Q</kbd>/<kbd>E</kbd> roll · drag to steer · arrows look, <kbd>V</kbd> recentre · <kbd>Shift</kbd> boost, <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · <kbd>L</kbd> land · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
+    this.root.innerHTML = `<div class="letterbox" aria-hidden="true"></div><header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small id="hud-speed-unit">km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div class="boost-cell"><span class="micro">Boost <kbd>Shift</kbd></span><span class="boost-row"><button id="boost-down" aria-label="Less boost">−</button><strong id="hud-boost">×10</strong><button id="boost-up" aria-label="More boost">+</button></span></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-land" hidden>Land</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · <kbd>R</kbd>/<kbd>F</kbd> pitch · <kbd>Q</kbd>/<kbd>E</kbd> roll · drag to steer · arrows look, <kbd>V</kbd> recentre · <kbd>Shift</kbd> boost, <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · <kbd>L</kbd> land · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
     document.body.append(this.root);
     this.fade = document.createElement("div");
     this.fade.className = "atlas-fade";
@@ -1062,11 +1095,14 @@ export class Atlas {
     let cap = THREE.MathUtils.clamp(this.clearance(s.side, s.pos, 0) * 0.45, 0.05, 260);
     const r = s.zone ? radiusAt(s.zone.l) : s.pos.distanceTo(this.bridge.mouths[s.side]);
     cap = Math.min(cap, 0.55 * r + 0.25);
+    // Through the throat itself, an unhurried glide so the tunnel has time to open up.
+    if (s.zone) cap *= 1 - 0.5 * (1 - THREE.MathUtils.smoothstep(s.zone.l, A, L1));
     return cap;
   }
-  private turnToward(dir: THREE.Vector3, dt: number, rate = 1) {
+  private turnToward(dir: THREE.Vector3, dt: number, rate = 1, level = false) {
     const s = this.ship;
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.quat);
+    // Level: roll back to the system's horizon rather than keep the current bank.
+    const up = level ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 1, 0).applyQuaternion(s.quat);
     const target = new THREE.Quaternion().setFromRotationMatrix(
       new THREE.Matrix4().lookAt(new THREE.Vector3(), dir, up),
     );
@@ -1125,14 +1161,21 @@ export class Atlas {
           const focus = s.side === "gargantua" ? new THREE.Vector3() : this.body("saturn")!.group.position;
           dir.copy(focus).sub(s.pos).normalize();
           speed = 0;
-          if (s.vel.length() < 0.03 && forward.angleTo(dir) < 0.08) {
+          const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.quat);
+          if (s.vel.length() < 0.03 && forward.angleTo(dir) < 0.08 && up.y > 0.97) {
             this.autopilot = null;
             this.setCard(s.side === "gargantua" ? "gargantua" : "saturn");
           }
         }
       }
       if (this.autopilot || faceOnly) {
-        const angle = this.turnToward(dir, dt, 1);
+        const settling = ap.kind === "wormhole" && ap.phase === "settle";
+        const angle = this.turnToward(dir, dt, 1, settling);
+        // A slow barrel roll through the throat, like the Endurance going in; levelled on the far side.
+        if (ap.kind === "wormhole" && s.zone && !settling) {
+          const deep = 1 - THREE.MathUtils.smoothstep(s.zone.l, A * 0.6, L1);
+          s.quat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), deep * 0.32 * dt));
+        }
         turning = Math.min(1, angle * 2);
         if (!faceOnly) {
           const desired = dir.clone().multiplyScalar(angle < 0.6 ? speed : speed * 0.15);
@@ -1471,9 +1514,15 @@ export class Atlas {
 
     if (!this.routes.open) this.fly(dt);
     const z = this.ship.zone;
-    const nearThroat = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.5, L1 * 1.1) : 0;
-    this.shake = THREE.MathUtils.damp(this.shake, nearThroat * Math.min(1, this.ship.vel.length() / 1.2 + 0.25), 3, dt);
+    // Tidal buffeting follows the curvature: it peaks where the flare bends into the
+    // throat (r″ is largest at ℓ = a) and falls to an eerie calm inside the cylinder.
+    const storm = z ? Math.exp(-(((z.l - A * 1.1) / (0.9 * RHO)) ** 2)) : 0;
+    const calm = z ? 0.12 * (1 - THREE.MathUtils.smoothstep(z.l, A * 0.7, A)) : 0;
+    const buffet = Math.max(storm, calm) * Math.min(1, this.ship.vel.length() / 0.8 + 0.3);
+    this.shake = THREE.MathUtils.damp(this.shake, buffet, 3, dt);
     this.ambience?.flight(this.ship.thrust, this.shake);
+    const deep = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.4, L2 * 0.85) : 0;
+    this.transit = THREE.MathUtils.damp(this.transit, deep, 1.6, dt);
     this.placeCamera(dt);
 
     // World visibility follows the camera's side of the bridge.
@@ -1493,7 +1542,14 @@ export class Atlas {
         : this.clearance(side, this.camera.position, this.camZone ? 0 : RZ);
     this.camera.near = THREE.MathUtils.clamp(camClear * 0.3, 0.004, 2);
     this.camera.updateProjectionMatrix();
+    // Breathe the lens wider deep in the throat; the ray tracer follows the new field of view.
+    this.camera.fov = this.view === "orbit" ? 50 : 50 + 18 * this.transit;
     this.shipCamera.fov = this.camera.fov;
+    this.bloom.strength = 0.3 + 0.35 * this.transit;
+    const smear = this.view === "orbit" ? 0 : this.transit;
+    this.transitPass.enabled = smear > 0.01;
+    this.transitPass.uniforms.uAmount.value = smear;
+    this.transitPass.uniforms.uAspect.value = innerWidth / innerHeight;
     this.shipCamera.updateProjectionMatrix();
 
     // Lens: inside the region we trace from the camera; outside we trace from the sphere.
@@ -1606,6 +1662,11 @@ export class Atlas {
     }
     document.getElementById("hud-speed-unit")!.textContent = "km/s";
     this.root.classList.toggle("in-bridge", !!this.camZone && this.camZone.l < L1);
+    const onCourse =
+      this.autopilot?.kind === "wormhole" &&
+      this.autopilot.phase !== "settle" &&
+      (!!s.zone || s.pos.distanceTo(this.bridge.mouths[s.side]) < RZ * 1.6);
+    this.root.classList.toggle("cine", onCourse || (!!s.zone && s.zone.l < L1));
     // 1 world unit ≈ 0.91 km at the ship's scale (the Endurance ring is 64 m across).
     const kmPerUnit = 0.064 / (SHIP_R * 2);
     document.getElementById("hud-speed")!.textContent = (s.vel.length() * kmPerUnit).toFixed(s.vel.length() * kmPerUnit < 10 ? 2 : 0);
@@ -1623,8 +1684,12 @@ export class Atlas {
     const ap = this.autopilot;
     document.getElementById("atlas-state")!.textContent = this.paused
       ? "TIME PAUSED · FLIGHT AVAILABLE"
-      : s.zone && s.zone.l < L1
-        ? "BRIDGE TRANSIT · EINSTEIN–ROSEN THROAT"
+      : s.zone && s.zone.l < A
+        ? "INSIDE THE THROAT · SPACE FOLDED INTO A TUNNEL"
+        : s.zone && s.zone.l < L1
+          ? s.vel.dot(s.zone.n) < 0
+            ? "BRIDGE TRANSIT · ENTERING THE THROAT"
+            : "BRIDGE TRANSIT · EMERGING"
         : ap?.kind === "wormhole"
           ? "AUTOPILOT · COURSE FOR THE WORMHOLE"
           : ap?.kind === "body"

@@ -47,6 +47,15 @@ void main() {
   float b = r * tl, phi = 0.;
   int status = 0;
   for (int i = 0; i < 280; i++) {
+    // Inside the cylindrical throat r = ρ and r′ = 0, so p is constant and the ray
+    // winds at a steady rate: jump straight to the far end of the cylinder.
+    if (abs(l) < uA) {
+      if (abs(p) < 1e-4) break;
+      float target = sign(p) * uA;
+      phi += b / (uRho * uRho) * (target - l) / p;
+      l = target;
+      r = uRho;
+    }
     // Step grows with radius; the flare scale M is still resolved by ~4 steps.
     float h = .055 * r + .012 * uRho;
     float s1 = drdl(l);

@@ -1,6 +1,10 @@
 # Project updates
 
 ## 2026-09-23
+### 17:03
+- Longer, more cinematic wormhole transit: the throat is twice as long (2a = 3ρ, flare unchanged so the outside view is the same), traced exactly with an analytic jump through the cylinder, and the passage takes ~20 s with ~9 s gliding through the tunnel of ring images.
+- Cinematic layer on the real optics: letterbox bars and dimmed HUD, a slow barrel roll levelled on the far side, FOV breathing, subtle radial smear/fringe/vignette and extra bloom. Buffeting now follows the curvature (peaks where the flare meets the throat, eerie calm inside), with phase readouts: entering, inside the throat, emerging.
+
 ### 14:28
 - Published the project to GitHub and deployed the production Vite build to Vercel at https://gargantua-lilac.vercel.app.
 - Added `.vercelignore` to exclude local build output, dependencies, and generated media from uploads.
