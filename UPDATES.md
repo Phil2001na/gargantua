@@ -1,6 +1,13 @@
 # Project updates
 
 ## 2026-09-23
+### 14:28
+- Published the project to GitHub and deployed the production Vite build to Vercel at https://gargantua-lilac.vercel.app.
+- Added `.vercelignore` to exclude local build output, dependencies, and generated media from uploads.
+
+### 10:46
+- Rendered a 90-second 1080p trailer for Twitter (`artifacts/gargantua-trailer.mp4`, git-ignored): scripted flight through the observatory, Saturn's wormhole, the Gargantua flyby, Miller's wave, Mann's clouds and an end card. Frames were captured headless with a virtual clock; the soundtrack is an original organ score plus the app's engine and rumble layers, rendered offline.
+
 ### 01:58
 - Ship at a truer scale: the Endurance is about 9x smaller, so worlds and the wormhole dwarf it. Boost is now adjustable (x2 to x250, default x10) with [ / ] or HUD buttons.
 - Landing on Miller and Mann: dive into the atmosphere, press L, or use "Land on ..." in the route chart. The Ranger flies true-scale areas: Miller's shallow ocean with 1+ km tidal waves that lift you, plus an Earth-time clock; Mann's ice ridges under frozen clouds. Gargantua is ray-traced into both skies. Climb above 16 km or press L to return to orbit.
