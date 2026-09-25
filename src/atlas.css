@@ -309,6 +309,29 @@
 .in-bridge {
   background: none;
 }
+/* Cinematic wormhole: letterbox bars during the crossing. */
+.atlas-ui::before,
+.atlas-ui::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #000;
+  z-index: 20;
+  pointer-events: none;
+  transition: height 1.2s ease;
+}
+.atlas-ui::before {
+  top: 0;
+}
+.atlas-ui::after {
+  bottom: 0;
+}
+.atlas-ui.cine-bars::before,
+.atlas-ui.cine-bars::after {
+  height: 11vh;
+}
 .in-bridge .world-card,
 .in-bridge .world-label,
 .in-bridge .atlas-hint {

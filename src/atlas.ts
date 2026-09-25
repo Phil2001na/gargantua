@@ -356,10 +356,25 @@ export class Atlas {
   private cardTimer = 0;
   private shake = 0;
   private crossings = 0;
+  /** Wormhole look: the physical ray tracer, or the film's treatment (switchable any time). */
+  private cinematic = (() => {
+    try {
+      return localStorage.getItem("wormhole-look") === "cinematic";
+    } catch {
+      return false;
+    }
+  })();
+  /** 0..1 blend toward the cinematic look, eased so switching mid-crossing is smooth. */
+  private cine = 0;
+  /** Their ripple through the throat: time since it began (−1 when not running). */
+  private theyT = -1;
+  private theyDone = false;
   /** True-scale landing sites on Miller and Mann. */
   private surface: Surface;
   private landing: { t: number; to: "surface" | "orbit"; id: SurfaceId; switched: boolean } | null = null;
   private fade!: HTMLDivElement;
+  /** Set by the app: fly the Ranger down to the farm in story mode (seamless Earth). */
+  onEarthLanding: (() => void) | null = null;
   /** Direction from the world's centre when the Ranger went down, to climb back out the same way. */
   private landedFrom = new THREE.Vector3(0, 1, 0);
   constructor(
@@ -483,6 +498,9 @@ export class Atlas {
         uL1: { value: L1 },
         uL2: { value: L2 },
         uRz: { value: RZ },
+        uCine: { value: 0 },
+        uTime: { value: 0 },
+        uThey: { value: 0 },
       },
     });
     this.lens = new THREE.Mesh(new THREE.SphereGeometry(RZ, 96, 64), this.lensMaterial);
@@ -524,7 +542,7 @@ export class Atlas {
     this.root = document.createElement("section");
     this.root.className = "atlas-ui";
     this.root.hidden = true;
-    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small id="hud-speed-unit">km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div class="boost-cell"><span class="micro">Boost <kbd>Shift</kbd></span><span class="boost-row"><button id="boost-down" aria-label="Less boost">−</button><strong id="hud-boost">×10</strong><button id="boost-up" aria-label="More boost">+</button></span></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-land" hidden>Land</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · <kbd>R</kbd>/<kbd>F</kbd> pitch · <kbd>Q</kbd>/<kbd>E</kbd> roll · drag to steer · arrows look, <kbd>V</kbd> recentre · <kbd>Shift</kbd> boost, <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · <kbd>L</kbd> land · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
+    this.root.innerHTML = `<header class="atlas-top"><div><span class="micro">ENDURANCE / NAVIGATION</span><h1 id="sector-name">Solar system</h1></div><div class="atlas-tools"><button id="atlas-map">Route chart <kbd>Tab</kbd></button><button id="atlas-exit">Black hole observatory</button></div></header><div id="world-labels"></div><article class="world-card"><div class="micro" id="world-subtitle"></div><h2 id="world-name"></h2><p id="world-description"></p><div id="world-fact"></div></article><div class="flight-hud"><div><span class="micro">Velocity</span><strong id="hud-speed">0</strong><small id="hud-speed-unit">km/s</small></div><div><span class="micro">Throttle</span><i class="throttle"><b id="hud-throttle"></b></i></div><div class="boost-cell"><span class="micro">Boost <kbd>Shift</kbd></span><span class="boost-row"><button id="boost-down" aria-label="Less boost">−</button><strong id="hud-boost">×10</strong><button id="boost-up" aria-label="More boost">+</button></span></div><div><span class="micro" id="hud-range-label">Throat</span><strong id="hud-range">—</strong><small id="hud-range-unit"></small></div></div><footer class="atlas-bottom"><div class="atlas-readout"><span class="micro" id="atlas-state">Manual flight</span><strong id="atlas-distance"></strong><small>Exploration scale · sizes and distances compressed · wormhole ray-traced</small></div><div class="atlas-actions"><button id="atlas-view" title="Camera (C)">View: Chase</button><button id="atlas-orbit" aria-pressed="false">Orbit</button><button id="atlas-land" hidden>Land</button><button id="atlas-wormhole" title="Autopilot through the wormhole (G)">Autopilot: wormhole</button><button id="atlas-look" title="Wormhole look: physical or cinematic (K)">Wormhole: Physical</button><button id="atlas-pause" aria-label="Pause atlas">Pause</button></div><div class="atlas-hint"><kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd>/<kbd>D</kbd> yaw · <kbd>R</kbd>/<kbd>F</kbd> pitch · <kbd>Q</kbd>/<kbd>E</kbd> roll · drag to steer · arrows look, <kbd>V</kbd> recentre · <kbd>Shift</kbd> boost, <kbd>[</kbd>/<kbd>]</kbd> strength · <kbd>X</kbd> brake · <kbd>C</kbd> camera · <kbd>G</kbd> wormhole · <kbd>K</kbd> wormhole look · <kbd>L</kbd> land · scroll zoom · <kbd>H</kbd> hide · <kbd>M</kbd> sound</div><div class="atlas-touch"><button data-thrust="w" aria-label="Thrust forward">Thrust</button><button data-thrust="s" aria-label="Reverse thrust">Reverse</button><button data-thrust="x" aria-label="Brake">Brake</button></div></footer>`;
     document.body.append(this.root);
     this.fade = document.createElement("div");
     this.fade.className = "atlas-fade";
@@ -579,6 +597,8 @@ export class Atlas {
     $("boost-down").onclick = () => this.setBoost(this.boostLevel - 1);
     $("boost-up").onclick = () => this.setBoost(this.boostLevel + 1);
     $("atlas-wormhole").onclick = () => this.goWormhole();
+    $("atlas-look").onclick = () => this.setCinematic(!this.cinematic);
+    this.setCinematic(this.cinematic);
     $("atlas-land").onclick = () => this.toggleLanding();
     $("atlas-orbit").onclick = () => this.setView(this.view === "orbit" ? "chase" : "orbit");
     $("atlas-view").onclick = () => this.cycleView();
@@ -646,6 +666,7 @@ export class Atlas {
       if (k === "c") this.cycleView();
       if (k === "m" && !e.repeat) document.getElementById("audio")!.click();
       if (k === "g") this.goWormhole();
+      if (k === "k" && !e.repeat) this.setCinematic(!this.cinematic);
       if (k === "l" && !e.repeat) this.toggleLanding();
       // Arrow keys look around; they never take the controls away from the autopilot.
       if (k.startsWith("arrow")) {
@@ -881,6 +902,36 @@ export class Atlas {
     this.placeAtStart();
     this.resize();
   }
+  /**
+   * Arrive from story mode: the Endurance just docked in low orbit. Placed so Earth's
+   * horizon sits where it did from 200 km up, on the day side, flying along the orbit.
+   */
+  openNearEarth() {
+    this.open();
+    const s = this.ship;
+    const e = this.body("earth")!;
+    const c = e.group.position;
+    const sunward = c.clone().negate().normalize();
+    const side = new THREE.Vector3(0, 1, 0).cross(sunward).normalize();
+    const up = sunward.clone().multiplyScalar(0.55).add(side.clone().multiplyScalar(-0.83)).normalize();
+    s.side = "solar";
+    s.zone = null;
+    // 1.035 radii puts the horizon 15° below level, as it is from 200 km up.
+    s.pos.copy(c).addScaledVector(up, e.data.radius * 1.035);
+    // Ride along with Earth on its orbit, so it doesn't slide away.
+    const w = (Math.PI * 2) / (2400 * periods.earth);
+    s.vel.set(-c.z * w, 0, c.x * w);
+    s.ang.set(0, 0, 0);
+    const along = new THREE.Vector3(0, 1, 0).cross(up).normalize();
+    s.quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(s.pos, s.pos.clone().add(along), up));
+    this.camQuat.copy(s.quat);
+    this.lastQuat.copy(s.quat);
+    this.selected = "saturn";
+    this.setCard("earth");
+    document.getElementById("world-subtitle")!.textContent = "Docked · leaving Earth orbit";
+    document.getElementById("world-description")!.textContent =
+      "The Ranger is aboard. Saturn is two years out; the route chart (Tab) will fly you there, or press L to take the Ranger back down to the farm.";
+  }
   /** Beyond the wormhole from Saturn: the giant hangs behind the sphere. */
   private placeAtStart() {
     const s = this.ship;
@@ -911,6 +962,20 @@ export class Atlas {
     document.body.classList.remove("exploring");
     this.exit();
   }
+  /** Physical: the metric, ray traced. Cinematic: the film's crystal ball and passage of light. */
+  private setCinematic(on: boolean) {
+    this.cinematic = on;
+    try {
+      localStorage.setItem("wormhole-look", on ? "cinematic" : "physical");
+    } catch {
+      /* private mode: just don't remember it */
+    }
+    const b = document.getElementById("atlas-look");
+    if (b) {
+      b.textContent = `Wormhole: ${on ? "Cinematic" : "Physical"}`;
+      b.setAttribute("aria-pressed", String(on));
+    }
+  }
   private setBoost(level: number) {
     this.boostLevel = THREE.MathUtils.clamp(level, 0, BOOSTS.length - 1);
     document.getElementById("hud-boost")!.textContent = `×${BOOSTS[this.boostLevel]}`;
@@ -937,6 +1002,19 @@ export class Atlas {
       cam.aspect = innerWidth / innerHeight;
       cam.updateProjectionMatrix();
     }
+  }
+  /** Gargantua's ray-traced sky, for other modes to light their worlds with. */
+  get gargantuaScene() {
+    return this.gargSkyScene;
+  }
+  /** Where a world sits in Gargantua's frame (as used for its surface's sky). */
+  surfacePoint(id: "miller" | "mann") {
+    return this.body(id)!.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+  }
+  /** The current frame as an image (for a crossfade into another mode). */
+  snapshot() {
+    this.composer.render();
+    return this.renderer.domElement.toDataURL("image/jpeg", 0.9);
   }
   private capture() {
     this.composer.render();
@@ -1013,6 +1091,13 @@ export class Atlas {
       button.innerHTML = `<span>${b.data.name}</span><small>${b.data.subtitle}</small><span>↗</span>`;
       button.onclick = () => this.go(b.data.id);
       list.append(button);
+      if (b.data.id === "earth" && this.onEarthLanding) {
+        const land = document.createElement("button");
+        land.className = "route-land";
+        land.innerHTML = `<span>Land at the Cooper farm</span><small>Take the Ranger down to the corn, at true scale</small><span>↓</span>`;
+        land.onclick = () => this.go("earth", true);
+        list.append(land);
+      }
       if (b.data.id === "miller" || b.data.id === "mann") {
         const land = document.createElement("button");
         land.className = "route-land";
@@ -1091,6 +1176,11 @@ export class Atlas {
         if (!b || b.data.sector !== s.side) this.autopilot = null;
         else {
           const center = b.group.position;
+          if (ap.land && ap.id === "earth" && s.pos.distanceTo(center) < b.data.radius * 1.8) {
+            this.autopilot = null;
+            this.onEarthLanding?.();
+            return;
+          }
           const standoffR = ap.land ? b.data.radius * 0.9 : b.data.id === "gargantua" ? 26 : b.data.radius * (b.data.id === "saturn" ? 3.6 : b.data.id === "sun" ? 3 : 4.2);
           const from = s.pos.clone().sub(center).normalize();
           from.y = Math.max(from.y, 0.18);
@@ -1219,8 +1309,12 @@ export class Atlas {
     return new THREE.Quaternion().setFromEuler(new THREE.Euler(this.look.pitch, this.look.yaw, 0, "YXZ"));
   }
   /** Nearest world you can land on, if the ship is close enough. */
-  private landable() {
-    if (this.ship.side !== "gargantua" || this.ship.zone) return null;
+  private landable(): SurfaceId | "earth" | null {
+    if (this.ship.zone) return null;
+    if (this.ship.side === "solar") {
+      const e = this.body("earth")!;
+      return this.onEarthLanding && this.ship.pos.distanceTo(e.group.position) < e.data.radius * 7 ? "earth" : null;
+    }
     for (const id of ["miller", "mann"] as const) {
       const b = this.body(id)!;
       if (this.ship.pos.distanceTo(b.group.position) < b.data.radius * 7) return id;
@@ -1232,7 +1326,8 @@ export class Atlas {
     if (this.surface.active) this.beginLanding(this.surface.id, "orbit");
     else {
       const id = this.landable();
-      if (id) this.beginLanding(id);
+      if (id === "earth") this.onEarthLanding?.();
+      else if (id) this.beginLanding(id);
     }
   }
   private beginLanding(id: SurfaceId, to: "surface" | "orbit" = "surface") {
@@ -1468,7 +1563,26 @@ export class Atlas {
     if (!this.routes.open) this.fly(dt);
     const z = this.ship.zone;
     const nearThroat = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.5, L1 * 1.1) : 0;
-    this.shake = THREE.MathUtils.damp(this.shake, nearThroat * Math.min(1, this.ship.vel.length() / 1.2 + 0.25), 3, dt);
+    this.cine = THREE.MathUtils.damp(this.cine, this.cinematic ? 1 : 0, 2.5, dt);
+    // The film's crossing buffets much harder.
+    this.shake = THREE.MathUtils.damp(this.shake, nearThroat * Math.min(1, this.ship.vel.length() / 1.2 + 0.25) * (1 + 1.6 * this.cine), 3, dt);
+    // Their ripple: once per crossing, as you pass the middle of the throat.
+    if (z && z.l < A * 0.35 && !this.theyDone) {
+      this.theyDone = true;
+      this.theyT = 0;
+    }
+    if (!z || z.l > L1) this.theyDone = false;
+    let they = 0;
+    if (this.theyT >= 0) {
+      this.theyT += dt;
+      they = Math.sin(Math.min(1, this.theyT / 4) * Math.PI);
+      if (this.theyT > 4) this.theyT = -1;
+    }
+    const lu = this.lensMaterial.uniforms;
+    lu.uCine.value = this.cine;
+    lu.uTime.value = this.elapsed;
+    lu.uThey.value = they;
+    this.root.classList.toggle("cine-bars", this.cine > 0.5 && nearThroat > 0.05);
     this.ambience?.flight(this.ship.thrust, this.shake);
     this.placeCamera(dt);
 
@@ -1489,6 +1603,13 @@ export class Atlas {
         : this.clearance(side, this.camera.position, this.camZone ? 0 : RZ);
     this.camera.near = THREE.MathUtils.clamp(camClear * 0.3, 0.004, 2);
     this.camera.updateProjectionMatrix();
+    // Cinematic: a wider lens deep in the passage.
+    const passage = this.camZone ? 1 - THREE.MathUtils.smoothstep(this.camZone.l, A, L1) : 0;
+    const fov = 50 + 14 * this.cine * passage;
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
     this.shipCamera.fov = this.camera.fov;
     this.shipCamera.updateProjectionMatrix();
 
@@ -1574,7 +1695,7 @@ export class Atlas {
     const landButton = document.getElementById("atlas-land")!;
     const nearby = this.surface.active ? null : this.landable();
     landButton.hidden = !this.surface.active && !nearby;
-    landButton.textContent = this.surface.active ? "Return to orbit (L)" : `Land on ${nearby === "mann" ? "Mann" : "Miller"} (L)`;
+    landButton.textContent = this.surface.active ? "Return to orbit (L)" : nearby === "earth" ? "Land at the farm (L)" : `Land on ${nearby === "mann" ? "Mann" : "Miller"} (L)`;
     this.root.classList.toggle("on-surface", this.surface.active);
     if (this.surface.active) {
       this.root.classList.remove("in-bridge");

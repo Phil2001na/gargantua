@@ -8,6 +8,7 @@ import starsChunk from "./shaders/stars.glsl?raw";
 import { createSky, skyUniforms } from "./sky";
 import { Ambience } from "./audio";
 import { Atlas } from "./atlas";
+import { Story } from "./story/story";
 import "./style.css";
 
 const icons = {
@@ -129,6 +130,44 @@ atlasLaunch.onclick = () => {
   atlas.open();
 };
 document.body.append(atlasLaunch);
+const story = new Story(renderer, () => {
+  last = performance.now();
+  resize();
+});
+const storyLaunch = document.createElement("button");
+storyLaunch.className = "story-launch";
+storyLaunch.innerHTML = "<span>New · playable story</span>Play from Earth ▶";
+storyLaunch.onclick = () => {
+  keys.clear();
+  story.open();
+};
+document.body.append(storyLaunch);
+/** Cover a mode switch: the last frame of the old mode dissolves into the new one. */
+function crossfade(image: string, seconds = 1.6) {
+  const img = document.createElement("img");
+  img.src = image;
+  img.alt = "";
+  img.style.cssText = `position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9999;pointer-events:none;transition:opacity ${seconds}s ease`;
+  document.body.append(img);
+  requestAnimationFrame(() => requestAnimationFrame(() => (img.style.opacity = "0")));
+  setTimeout(() => img.remove(), seconds * 1000 + 200);
+}
+story.gargantua = { scene: atlas.gargantuaScene, point: (id) => atlas.surfacePoint(id) };
+// Story mode's launch carries on into the atlas, and the atlas can land back at the farm.
+story.onAtlas = (shot) => {
+  keys.clear();
+  atlas.openNearEarth();
+  crossfade(shot);
+};
+atlas.onEarthLanding = () => {
+  const shot = atlas.snapshot();
+  atlas.close();
+  keys.clear();
+  story.homecoming();
+  crossfade(shot);
+};
+// Dev-only handle for stepping story frames from tests (rAF stops in hidden tabs).
+if (import.meta.env.DEV) Object.assign(window, { __story: story, __atlas: atlas });
 type Mode = "voyage" | "flight" | "orbit";
 let mode: Mode = "voyage",
   started = false,
@@ -399,7 +438,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach(
 const pointers = new Map<number, { x: number; y: number }>();
 let pinchDistance = 0;
 canvas.addEventListener("pointerdown", (e) => {
-  if (atlas.active) return;
+  if (atlas.active || story.active) return;
   canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -409,7 +448,7 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 });
 canvas.addEventListener("pointermove", (e) => {
-  if (atlas.active) return;
+  if (atlas.active || story.active) return;
   const previous = pointers.get(e.pointerId);
   if (!previous) return;
   const dx = e.clientX - previous.x,
@@ -439,7 +478,7 @@ canvas.addEventListener("pointerup", release);
 canvas.addEventListener("pointercancel", release);
 canvas.addEventListener("lostpointercapture", release);
 function dolly(amount: number) {
-  if (atlas.active) return;
+  if (atlas.active || story.active) return;
   if (mode === "voyage") setMode("orbit");
   if (mode === "orbit")
     orbitRadius = THREE.MathUtils.clamp(
@@ -471,7 +510,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach((b) => {
   b.onlostpointercapture = () => keys.delete(b.dataset.move!);
 });
 window.addEventListener("keydown", (e) => {
-  if (atlas.active) return;
+  if (atlas.active || story.active) return;
   if (info.open) return;
   if ((e.target as HTMLElement).matches("input,select,textarea")) return;
   const k = e.key.toLowerCase();
@@ -636,6 +675,10 @@ function animate(now: number) {
     atlas.update(Math.min(raw, .25));
     return;
   }
+  if (story.active) {
+    story.update(Math.min(raw, 0.25));
+    return;
+  }
   frame++;
   if (!paused) time += dt * speed;
   uniforms.uTime.value = time;
@@ -696,6 +739,7 @@ canvas.addEventListener("webglcontextlost", (e) => {
     '<p>Graphics connection interrupted.</p><button class="begin" onclick="location.reload()">Reload experience</button>';
 });
 // Read-only diagnostics for performance checks and reproducible QA.
+Object.defineProperty(window, "story", { get: () => (story.active ? story.diagnostics : null) });
 Object.defineProperty(window, "gargantua", {
   get: () => ({
     mode,

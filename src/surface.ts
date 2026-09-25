@@ -671,6 +671,46 @@ export class Surface {
   speed() {
     return this.ship.vel.length();
   }
+  /** Story mode draws this world with its own camera and composer: here is the scene. */
+  get world() {
+    return this.scene;
+  }
+  /** The flying Ranger (story mode hides it and places its own). */
+  get flyer() {
+    return this.ranger.group;
+  }
+  /**
+   * Story mode: advance the ocean and the sky by `dt` and follow `camera`, without flying
+   * the Ranger or rendering (the story does both).
+   */
+  stage(dt: number, camera: THREE.Camera) {
+    // Build the sky a strip at a time from the start: tracing all six faces in one frame can
+    // run past the GPU watchdog on integrated graphics and reset the device.
+    if (this.gargStep < 0) this.gargStep = 0;
+    this.time += dt;
+    const u = this.groundMaterial.uniforms;
+    u.uTime.value = this.time;
+    u.uCenter.value.set(Math.round(camera.position.x), 0, Math.round(camera.position.z));
+    this.placeClouds(camera.position);
+    this.refreshGargantua();
+  }
+  /** Seconds until the next wave's crest reaches (x, z), for scripting around it. */
+  waveEta(x: number, z: number) {
+    const s = x * WAVE_DIR.x + z * WAVE_DIR.y,
+      perp = -x * WAVE_DIR.y + z * WAVE_DIR.x;
+    const P = WAVE_PERIOD;
+    // The crest passes when s − vt − shift ≡ 0 (mod P); that offset shrinks at speed v.
+    const q = (((s - WAVE_SPEED * this.time - waveShift(perp)) % P) + P) % P;
+    return q / WAVE_SPEED;
+  }
+  /** Set the clock so the next crest reaches (x, z) in `seconds`. */
+  waveIn(x: number, z: number, seconds: number) {
+    this.time += this.waveEta(x, z) - seconds;
+  }
+  /** The direction the waves travel (horizontal, unit). */
+  static waveDir() {
+    return new THREE.Vector3(WAVE_DIR.x, 0, WAVE_DIR.y);
+  }
   /** Where the Ranger is heading, for the climb back to orbit. */
   forward() {
     return new THREE.Vector3(0, 0, -1).applyQuaternion(this.ship.quat);

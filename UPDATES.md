@@ -1,5 +1,33 @@
 # Project updates
 
+## 2026-09-25
+### 16:41
+- Story mode Section 7 (work in progress), Chapter 7 "Miller": descent to the knee-deep ocean under Gargantua, wading to the wreck, the wave, the drained engines, and the 23 years of messages aboard the Endurance, with a Miller/Earth clock. Reuses the atlas's Miller ocean. The first half is tested; the rescue onward still needs a play-through.
+### 14:11
+- Atlas: a switchable cinematic wormhole (button or K, remembered). The film's look: a brighter crystal ball with a thin glowing Einstein ring, a passage of rushing light lanes inside the throat, a ripple as you pass the middle, harder buffeting, letterbox and a wider lens. It blends smoothly and shares the physical crossing, so switching mid-crossing is safe.
+### 13:25
+- Story mode Section 5, Chapter 5 "Liftoff": a launch pad 10 km west of the compound, a two-stage booster with the Ranger on top, and one unbroken climb to a 206 km orbit on the true-size Earth (countdown, smoke, max Q, staging, the sky going black), then docking with the Endurance by hand or by TARS.
+- A ray-traced Earth with a single-scattering atmosphere behind the local map (`earth/globe.ts`, `earth/geo.ts`): the sky turns from dust to blue to black as you climb, the limb glows, and the farm country shows as fields from high up.
+- After docking, the story hands over to the atlas near Earth (crossfade, matched horizon); from the atlas, "Land at the farm" (L) crossfades back into a Ranger descent you fly (or let TARS fly) from 120 km down to the yard.
+
+## 2026-09-24
+### 23:58
+- Story mode Section 4, Chapter 4 "Don't Go": at dusk Cooper sits with Murph on her bed (a reply choice), she reveals the ghost's "STAY" as another book falls, and he gives her a watch set to the same second as his; a close-up of the two watches ticking, then he leaves hers on the bookshelf. Next morning, goodbyes to Donald and Tom, the drive out, Murph running onto the porch too late, and a mission-control countdown over the drive that cuts to black at liftoff.
+- New: a reusable watch model (`earth/watch.ts`, for the tesseract), numbered reply choices in the UI, a scripted autopilot for the truck, and tick, radio-beep and launch-rumble sounds. Chapter 3 now continues into Chapter 4.
+### 20:35
+- Story mode Section 3, Chapter 3 "Coordinates": a night drive (headlights, stars, crickets) from the farm to a fenced compound 5.4 km north, with Murph revealed as a stowaway and an optional "an hour later" skip; a security drone with a searchlight that kills the truck at the gate; an interrogation room with TARS (four hinged slabs that walk), Brand and the Professor; a walk through a 60 m underground hall with a half-built station ring and a Ranger; and a hologram mission brief. Dialogue is original.
+- Chapter 2 flows into Chapter 3; README and BUILD_PLAN updated (Sections 2 and 3 marked first-pass done).
+### 20:02
+- Story mode Section 2, Chapter 2 "The Ghost": Murph's room upstairs in the farmhouse (bookshelf, bed, desk, lander model, curtains, a working sash window) with a scripted book-falling "ghost"; a drive home racing a kilometre-high dust storm wall across the plains; dust pouring through the open window as a per-grain simulation that settles in bands; and a notebook puzzle that reads the bands as binary coordinates.
+- World: time-of-day and weather moods (morning, evening, storm, night with stars), truck headlights that light the terrain and corn shaders, and a house shell with real window openings so sunlight enters rooms.
+### 15:01
+- Story mode, Sections 0 and 1 of `BUILD_PLAN.md`: a "Play from Earth" entry opens a chapter menu; Chapter 1 "The Dust" is playable. It has an opening flyover, walking from the porch to the truck, the drive, and a drone chase through true-scale corn to the reservoir cliff. It ends with a laptop link mini-game and a landing cutscene. Dialogue is original.
+- Engine (`src/story/`): generator-based scripts, camera rails, subtitles, objectives, markers, fades, pause menu with checkpoints, hold-Space skip, pointer-lock input, synthesised sound (engine, gravel, corn, drone, birds), adaptive resolution and quality tiers.
+- Earth (`src/story/earth/`): terrain, roads, corn layout and canyon, each written once in JS and once in GLSL; about 40k instanced corn plants that the truck flattens and pushes aside; a distance canopy; dust haze; curvature; farmhouse, barn, bins and windmill (merged draw calls); an arcade pickup truck and a 16 m solar drone. Measured at 18–33 ms per frame on Intel UHD.
+
+### 13:31
+- Added `BUILD_PLAN.md`: a sectioned plan for a playable story mode (farm and drone chase → NASA → seamless true-scale launch → cinematic wormhole toggle → Miller → Gargantua → tesseract → Cooper Station), to be built one section at a time.
+
 ## 2026-09-23
 ### 21:24
 - Fixed the dark, misty sky around the wormhole mouth on Gargantua's side: its sky was a low-res cube copied twice, then magnified by the lens. The lens now takes only the diffuse glow from the cache and draws Gargantua's stars itself at screen resolution (weak-field bend).

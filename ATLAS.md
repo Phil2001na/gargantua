@@ -1,6 +1,6 @@
 # Two skies, one journey
 
-Choose **Explore both systems** to take command of the Endurance, parked beyond the wormhole near Saturn. Fly into the sphere yourself, or press **Autopilot: wormhole** (G). There is no cut or loading screen: the ship flies through the throat, and the other system is what the light already shows. The **Route chart** (Tab) sends the autopilot to any world in your current system. **Black hole observatory** returns to the original experience.
+Choose **Explore both systems** to take command of the Endurance, parked beyond the wormhole near Saturn. Fly into the sphere yourself, or press **Autopilot: wormhole** (G). There is no cut or loading screen: the ship flies through the throat, and the other system is what the light already shows. The **Route chart** (Tab) sends the autopilot to any world in your current system. Near Earth, **L** (or *Land at the Cooper farm* in the route chart) takes the Ranger down to the farm in story mode. **Black hole observatory** returns to the original experience.
 
 ## Worlds and controls
 
@@ -21,6 +21,8 @@ Miller/Mann/Edmunds positions, dimensions, environments and orbital periods are 
 The wormhole is ray-traced through the metric the film's visual-effects team published (James, von Tunzelmann, Franklin & Thorne, *Visualizing Interstellar's Wormhole*, Am. J. Phys. 83, 486, 2015): a cylindrical throat of radius ρ and length 2a whose walls flare out with lensing length M. Each pixel's light ray is integrated along its null geodesic. Rays that pass through the throat show the other system; rays that turn back show our own sky, bent into an Einstein ring around the sphere. Here ρ = 2.5 units (about 36 Endurance diameters), a = 0.7ρ and M = 0.22ρ. Beyond 2.6ρ the flare is blended smoothly into flat space by 5.5ρ, so the ray-traced region joins the ordinary scene without a seam (a departure from the paper, whose lensing extends indefinitely).
 
 The Endurance and its cameras move in the same wormhole coordinates, so the crossing is continuous rather than a cut. Each side's worlds are captured into environment maps every frame: one at the camera and one at the matching point beyond the throat. The ray tracer samples these, and stars are generated per pixel from each ray's final direction. Ship motion near the throat uses the metric's radial coordinate but is flown with thrusters; it is not a free-fall geodesic. Tidal forces, time dilation in the bridge and the paper's exact camera speeds are not modelled.
+
+**Wormhole: Physical / Cinematic** (K) switches the look without touching the physics. Cinematic mode follows the film rather than the paper: the far galaxy is brighter through the sphere, a thin glowing Einstein ring marks the rays that just graze the throat, and inside the throat a passage of rushing light lanes, a ripple as you pass the middle, harder buffeting, letterbox bars and a wider lens replace the undistorted view. The light lanes and ripple are artistic, not ray-traced. The choice is remembered, and switching mid-crossing blends smoothly.
 
 ## Sources and implementation
 
