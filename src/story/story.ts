@@ -7,11 +7,13 @@ import { Input, Rail, Script, type ScriptFn } from "./engine";
 import { StoryUI, type ChapterEntry } from "./ui";
 import { StoryAudio } from "./sound";
 import { EarthWorld } from "./earth/world";
+import type { Atlas } from "../atlas";
 import { FarmChapter } from "./chapters/farm";
 import { GhostChapter } from "./chapters/ghost";
 import { CoordinatesChapter } from "./chapters/coordinates";
 import { GoodbyeChapter } from "./chapters/goodbye";
 import { LaunchChapter } from "./chapters/launch";
+import { WormholeChapter } from "./chapters/wormhole";
 import { MillerChapter } from "./chapters/miller";
 
 /** A playable chapter. It owns its script and controls; the Story owns rendering and UI. */
@@ -72,7 +74,14 @@ const CHAPTERS: ChapterDef[] = [
     ready: true,
     make: (s) => new LaunchChapter(s),
   },
-  { id: "wormhole", number: "06", title: "The Wormhole", blurb: "Saturn, and a sphere in space.", ready: false },
+  {
+    id: "wormhole",
+    number: "06",
+    title: "The Wormhole",
+    blurb: "Saturn, and a sphere in space.",
+    ready: true,
+    make: (s) => new WormholeChapter(s),
+  },
   {
     id: "miller",
     number: "07",
@@ -100,6 +109,9 @@ export class Story {
   gargantua: { scene: THREE.Scene; point: (id: "miller" | "mann") => THREE.Vector3 } | null = null;
   /** Set by the app: continue into the space atlas near Earth (after the launch). */
   onAtlas: ((snapshot: string) => void) | null = null;
+  /** Set by the app: the space atlas, which a chapter in space can host (see `host`). */
+  atlas: Atlas | null = null;
+  private hosting = false;
   private composer: EffectComposer;
   private pass: RenderPass;
   private bloom: UnrealBloomPass;
@@ -200,6 +212,7 @@ export class Story {
     this.chapter.start(checkpoint);
   }
   private endChapter() {
+    this.unhost();
     this.setScene(null);
     this.script.stop();
     this.side.stop();
@@ -239,6 +252,30 @@ export class Story {
   homecoming() {
     this.open();
     this.play("launch", "home");
+  }
+
+  /**
+   * A chapter in space: the atlas draws the frame (ship, wormhole, skies) and flies the
+   * Endurance, while the story's script, subtitles, letterbox, pause and skip run on top.
+   * Ends with the chapter (or `unhost`).
+   */
+  host(at: "saturn" | "beyond" = "saturn") {
+    const atlas = this.atlas;
+    if (!atlas) throw new Error("Story.host: no atlas");
+    if (!this.hosting) {
+      this.hosting = true;
+      atlas.host(at);
+    }
+    return atlas;
+  }
+  unhost() {
+    if (!this.hosting) return;
+    this.hosting = false;
+    this.atlas?.unhost();
+    this.resize();
+  }
+  get hostingAtlas() {
+    return this.hosting;
   }
 
   // --- Helpers for chapters -----------------------------------------------------
@@ -302,6 +339,10 @@ export class Story {
   }
 
   resize() {
+    if (this.hosting) {
+      this.atlas?.resize();
+      return;
+    }
     const w = Math.max(1, Math.round(innerWidth * this.renderScale)),
       h = Math.max(1, Math.round(innerHeight * this.renderScale));
     this.renderer.setPixelRatio(1);
@@ -347,9 +388,12 @@ export class Story {
       this.side.step(dt);
       if (this.rail) this.rail.apply(this.camera, dt);
       this.chapter.update(dt);
+      // A hosted atlas flies, renders and runs its own adaptive resolution.
+      if (this.hosting) this.atlas?.update(dt);
     }
     this.ui.update(dt);
     input.endFrame();
+    if (this.hosting) return;
     this.applyQuality();
     this.composer.render();
     if (!this.shownFirstFrame) {

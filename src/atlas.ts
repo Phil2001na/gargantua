@@ -232,6 +232,8 @@ const domeVertex = `varying vec3 vDir; void main(){vDir=(modelMatrix*vec4(positi
 
 /** Endurance ring radius in world units: the throat is ~600 ships across, a world thousands. */
 const SHIP_R = 0.004;
+/** Keys a hosted atlas still takes when the story hands over the controls (story owns the rest). */
+const HOSTED_KEYS = ["w", "a", "s", "d", "q", "e", "r", "f", "x", "shift", "c", "k", "v", "[", "]"];
 /** Boost multipliers, stepped with [ and ]. */
 const BOOSTS = [2, 5, 10, 25, 50, 100, 250];
 /** Solar mouth relative to Saturn; Gargantua mouth in its system. */
@@ -369,6 +371,11 @@ export class Atlas {
   /** Their ripple through the throat: time since it began (−1 when not running). */
   private theyT = -1;
   private theyDone = false;
+  private theyNow = 0;
+  /** True from the moment the ship changes sides until it leaves the lens region. */
+  private zoneCrossed = false;
+  /** Story mode is driving the atlas (a chapter in space); `controls` lets the player fly. */
+  private hostedBy: { controls: boolean } | null = null;
   /** True-scale landing sites on Miller and Mann. */
   private surface: Surface;
   private landing: { t: number; to: "surface" | "orbit"; id: SurfaceId; switched: boolean } | null = null;
@@ -623,7 +630,7 @@ export class Atlas {
 
     const canvas = renderer.domElement;
     canvas.addEventListener("pointerdown", (e) => {
-      if (!this.active || this.view === "orbit") return;
+      if (!this.active || this.view === "orbit" || (this.hostedBy && !this.hostedBy.controls)) return;
       this.steer = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
     });
@@ -638,7 +645,7 @@ export class Atlas {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        if (!this.active || this.view === "orbit") return;
+        if (!this.active || this.view === "orbit" || (this.hostedBy && !this.hostedBy.controls)) return;
         e.preventDefault();
         this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(e.deltaY * 0.001), 0.55, 40);
       },
@@ -646,6 +653,11 @@ export class Atlas {
     );
     window.addEventListener("keydown", (e) => {
       if (!this.active) return;
+      // Hosted, story mode owns Escape, Space and the menus; the player only gets the stick.
+      if (this.hostedBy) {
+        const k = e.key.toLowerCase();
+        if (!this.hostedBy.controls || !(HOSTED_KEYS.includes(k) || k.startsWith("arrow"))) return;
+      }
       if (e.key === "Escape") {
         this.root.classList.remove("atlas-clean");
         return;
@@ -708,6 +720,7 @@ export class Atlas {
     Object.defineProperty(window, "interstellar", {
       get: () => ({
         active: this.active,
+        hosted: this.hostedBy ? this.hostState : null,
         sector: this.camSide,
         shipSide: this.ship.side,
         selected: this.selected,
@@ -961,6 +974,89 @@ export class Atlas {
     this.ambience?.flight(0, 0);
     document.body.classList.remove("exploring");
     this.exit();
+  }
+  /**
+   * Story mode takes the atlas over for a chapter in space: the story's script and subtitles
+   * run on top, the atlas HUD shrinks to the flight readout, and there is no way out to the
+   * observatory. Opens at Saturn's mouth, or just through on Gargantua's side ("beyond").
+   */
+  host(at: "saturn" | "beyond" = "saturn", controls = false) {
+    this.hostedBy = { controls };
+    this.open();
+    this.paused = false;
+    this.root.classList.add("atlas-hosted");
+    this.root.classList.remove("atlas-clean");
+    if (at === "beyond") this.placeBeyond();
+  }
+  /** Hand the canvas back to story mode (no exit to the observatory). */
+  unhost() {
+    if (!this.hostedBy) return;
+    this.hostedBy = null;
+    this.active = false;
+    this.autopilot = null;
+    this.landing = null;
+    this.root.hidden = true;
+    this.root.classList.remove("atlas-hosted", "cine-bars");
+    this.keys.clear();
+    this.steer = null;
+    this.ambience?.flight(0, 0);
+    document.body.classList.remove("exploring");
+  }
+  get hosted() {
+    return !!this.hostedBy;
+  }
+  /** Lock the ship to the story (autopilot and scripts) or hand the controls to the player. */
+  setHostControls(on: boolean) {
+    if (!this.hostedBy) return;
+    this.hostedBy.controls = on;
+    this.root.classList.toggle("atlas-hosted-controls", on);
+    if (!on) {
+      this.keys.clear();
+      this.steer = null;
+    }
+  }
+  /** Fly the Endurance through the bridge on autopilot (hosted chapters). */
+  autopilotWormhole() {
+    this.goWormhole();
+  }
+  /** Read-only flight state for a hosted chapter's script. */
+  get hostState() {
+    const z = this.ship.zone;
+    const ap = this.autopilot;
+    return {
+      side: this.ship.side,
+      /** Proper distance from the middle of the throat (null outside the lens region). */
+      throat: z ? z.l : null,
+      phase: (!z ? "outside" : z.l < A ? "throat" : this.zoneCrossed ? "emerging" : "entering") as
+        | "outside"
+        | "entering"
+        | "throat"
+        | "emerging",
+      crossings: this.crossings,
+      /** Their ripple, 0..1..0 over a few seconds as the ship passes the middle. */
+      they: this.theyNow,
+      autopilot: ap?.kind === "wormhole" ? ap.phase : ap ? "body" : null,
+      cinematic: this.cinematic,
+    };
+  }
+  /** Just through on Gargantua's side, heading out of the mouth (a skipped crossing). */
+  private placeBeyond() {
+    const s = this.ship;
+    const mouth = this.bridge.mouths.gargantua;
+    const out = mouth.clone().negate().normalize();
+    s.side = "gargantua";
+    s.zone = null;
+    this.zoneCrossed = false;
+    s.pos.copy(mouth).addScaledVector(out, RZ * 1.4);
+    s.vel.copy(out).multiplyScalar(0.05);
+    s.ang.set(0, 0, 0);
+    s.quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(s.pos, s.pos.clone().add(out), new THREE.Vector3(0, 1, 0)));
+    this.camQuat.copy(s.quat);
+    this.lastQuat.copy(s.quat);
+    this.crossings++;
+    this.selected = "gargantua";
+    this.autopilot = { kind: "wormhole", phase: "settle" };
+    this.setView("chase");
   }
   /** Physical: the metric, ray traced. Cinematic: the film's crystal ball and passage of light. */
   private setCinematic(on: boolean) {
@@ -1264,11 +1360,15 @@ export class Atlas {
       if (this.bridge.displace(s.zone, step, { vectors: [s.vel], quats: [s.quat, this.camQuat, this.lastQuat] })) {
         s.side = s.zone.side;
         this.crossings++;
+        this.zoneCrossed = true;
         if (this.autopilot?.kind === "wormhole") this.autopilot.phase = "exit";
         this.cardTimer = 0;
       }
       this.bridge.position(s.zone, s.pos);
-      if (s.zone.l >= L2) s.zone = null;
+      if (s.zone.l >= L2) {
+        s.zone = null;
+        this.zoneCrossed = false;
+      }
     }
     // Keep clear of solid bodies and the horizon.
     for (const b of this.bodies) {
@@ -1578,11 +1678,13 @@ export class Atlas {
       they = Math.sin(Math.min(1, this.theyT / 4) * Math.PI);
       if (this.theyT > 4) this.theyT = -1;
     }
+    this.theyNow = they;
     const lu = this.lensMaterial.uniforms;
     lu.uCine.value = this.cine;
     lu.uTime.value = this.elapsed;
     lu.uThey.value = they;
-    this.root.classList.toggle("cine-bars", this.cine > 0.5 && nearThroat > 0.05);
+    // Hosted, the story draws its own letterbox.
+    this.root.classList.toggle("cine-bars", !this.hostedBy && this.cine > 0.5 && nearThroat > 0.05);
     this.ambience?.flight(this.ship.thrust, this.shake);
     this.placeCamera(dt);
 

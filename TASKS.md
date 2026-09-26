@@ -45,7 +45,7 @@ The chapter drives the atlas (it already has the ray-traced wormhole, the ship, 
 maths and the cinematic look) while story mode supplies the script, subtitles, letterbox and
 skip. No second wormhole renderer.
 
-- [ ] **A1. Story can host the atlas.** Add a hosted mode to `Atlas` (`atlas.ts`): story opens
+- [x] **A1. Story can host the atlas.** *(2026-09-26: `Atlas.host/unhost/hostState`, `Story.host`, stub Chapter 6 flies through on autopilot with phase lines; pause, skip and end-to-menu checked, ~49 s, 40–60 fps.)* Add a hosted mode to `Atlas` (`atlas.ts`): story opens
   it at a given placement, hides the atlas HUD (keeps a slim flight HUD), locks or unlocks
   player controls, and exposes read-only state (side, throat ℓ, phase, crossing count, "they"
   ripple). `main.ts` loop: when hosted, story's update runs and calls `atlas.update`; story UI

@@ -1,6 +1,9 @@
 # Project updates
 
 ## 2026-09-26
+### 23:55
+- Story mode can host the atlas (TASKS A1): `Atlas.host()` opens it under story control with only the flight readout showing, gates its keys (story owns Escape, Space and menus), and exposes read-only crossing state (side, throat ℓ, phase, crossings, "they" ripple). `Story.host()` makes the story frame update and draw through the atlas; the chapter ending unhosts it.
+- Chapter 6 "The Wormhole" is playable as a first pass: it opens near Saturn, TARS flies the Endurance through on autopilot with a line at each phase of the crossing, and it ends on Gargantua's side ("On to Miller" or back to Chapters). Hold Space skips the crossing.
 ### 22:41
 - Added `TASKS.md`: a loopable work queue for the rest of story mode. Phase A is Chapter 6 "The Wormhole" (it was a menu placeholder; the crossing only existed in free flight), then finishing Miller, Gargantua, the tesseract, Cooper Station and release polish.
 

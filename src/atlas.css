@@ -493,3 +493,18 @@
 .route-land span:first-child {
   padding-left: 14px;
 }
+/* Hosted by story mode: only the flight readout stays; the story draws subtitles on top. */
+.atlas-hosted .atlas-top,
+.atlas-hosted .world-card,
+.atlas-hosted .atlas-bottom,
+.atlas-hosted #world-labels,
+.atlas-hosted .atlas-restore,
+.atlas-hosted .flight-hud .boost-cell {
+  display: none;
+}
+.atlas-hosted.atlas-hosted-controls .flight-hud .boost-cell {
+  display: grid;
+}
+.atlas-hosted .flight-hud {
+  opacity: 0.8;
+}

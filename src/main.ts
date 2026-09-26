@@ -153,6 +153,8 @@ function crossfade(image: string, seconds = 1.6) {
   setTimeout(() => img.remove(), seconds * 1000 + 200);
 }
 story.gargantua = { scene: atlas.gargantuaScene, point: (id) => atlas.surfacePoint(id) };
+// Chapters in space (the wormhole) borrow the atlas: story runs the frame, the atlas draws it.
+story.atlas = atlas;
 // Story mode's launch carries on into the atlas, and the atlas can land back at the farm.
 story.onAtlas = (shot) => {
   keys.clear();
@@ -671,7 +673,8 @@ function animate(now: number) {
     dt = Math.min(raw, 0.05);
   last = now;
   if (document.hidden) return;
-  if (atlas.active) {
+  // A hosted atlas is updated from story mode's frame instead.
+  if (atlas.active && !atlas.hosted) {
     atlas.update(Math.min(raw, .25));
     return;
   }
