@@ -1,5 +1,9 @@
 # Project updates
 
+## 2026-09-26
+### 22:41
+- Added `TASKS.md`: a loopable work queue for the rest of story mode. Phase A is Chapter 6 "The Wormhole" (it was a menu placeholder; the crossing only existed in free flight), then finishing Miller, Gargantua, the tesseract, Cooper Station and release polish.
+
 ## 2026-09-25
 ### 16:41
 - Story mode Section 7 (work in progress), Chapter 7 "Miller": descent to the knee-deep ocean under Gargantua, wading to the wreck, the wave, the drained engines, and the 23 years of messages aboard the Endurance, with a Miller/Earth clock. Reuses the atlas's Miller ocean. The first half is tested; the rescue onward still needs a play-through.
