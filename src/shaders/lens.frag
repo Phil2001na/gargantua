@@ -28,6 +28,8 @@ uniform float uRz;
 uniform float uCine;
 uniform float uTime;
 uniform float uThey;
+// How far their wavefront has swept past the camera (0 = ahead, 1 = gone behind).
+uniform float uTheyP;
 
 float drdl(float l) {
   float L = abs(l);
@@ -81,9 +83,14 @@ vec3 lanes(vec3 d, vec3 n) {
 }
 void main() {
   vec3 d = normalize(vWorld - cameraPosition);
-  // Their touch: a slow ripple through the whole view (cinematic mode only).
+  // Their touch: a wavefront that sweeps through the ship from ahead to behind, bending
+  // the view where it passes (in both looks; the film's is stronger).
+  float front = 0.;
   if (uThey > 0.) {
-    float w = uThey * uCine * .035;
+    vec3 fwd = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+    float x = dot(d, fwd) - (1. - 2.4 * uTheyP);
+    front = exp(-x * x / .025) * uThey;
+    float w = uThey * (.012 + .03 * uCine) * (.3 + 2. * front / max(uThey, 1e-3));
     d = normalize(d + w * vec3(sin(dot(d, vec3(31., 17., 23.)) + uTime * 5.), sin(dot(d, vec3(19., 37., 11.)) - uTime * 4.), sin(dot(d, vec3(13., 29., 41.)) + uTime * 6.)));
   }
   vec3 n;
@@ -144,6 +151,9 @@ void main() {
       gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * .35 + lanes(d, uCamN), t * .9);
     }
   }
+  // The front itself glows faintly, like a heat shimmer catching the light.
+  gl_FragColor.rgb += vec3(.55, .65, .9) * front * (.06 + .14 * uCine);
+  gl_FragColor.a = max(gl_FragColor.a, front * .5);
   // One bad pixel would be smeared across the whole frame by the bloom: never emit one.
   float sum = gl_FragColor.r + gl_FragColor.g + gl_FragColor.b;
   if (!(sum >= 0. && sum < 1e4)) gl_FragColor.rgb = vec3(0.);

@@ -12,7 +12,7 @@ import { Fold, Frost } from "./saturn";
  * Dialogue is original, written for this project.
  */
 
-const KEYS = `The autopilot has the controls for now.<br>Hold <kbd>Space</kbd> to skip ahead`;
+const KEYS = `Fly: <kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd><kbd>D</kbd> <kbd>R</kbd><kbd>F</kbd> <kbd>Q</kbd><kbd>E</kbd> steer, or drag<br><kbd>T</kbd> TARS flies · <kbd>K</kbd> physical / cinematic · <kbd>C</kbd> view · Hold <kbd>Space</kbd> to skip`;
 
 type Shot = { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number };
 const UP = new THREE.Vector3(0, 1, 0);
@@ -39,6 +39,10 @@ export class WormholeChapter implements Chapter {
   private shotStart = 0;
   private frost: Frost | null = null;
   private fold: Fold | null = null;
+  /** The player has the stick; `tars` once TARS has taken it back. */
+  private flying = false;
+  private tars = false;
+  private picked = -1;
   constructor(private s: Story) {}
 
   start(checkpoint = "start") {
@@ -47,12 +51,15 @@ export class WormholeChapter implements Chapter {
     this.atlas = this.s.host("saturn");
     this.base = this.atlas.hostState.crossings;
     this.clock = 0;
+    this.flying = this.tars = false;
     this.s.cinematicMode = true;
     this.s.input.capture(false);
     this.s.run(() => (checkpoint === "approach" ? this.fromApproach() : this.arrival()));
   }
   dispose() {
     this.s.ui.hideCard();
+    this.s.ui.prompt(null);
+    this.s.ui.choice(null);
     this.setShot(null);
     this.clearOverlays();
     // Story ends the hosting itself (endChapter); nothing else of ours is in a scene.
@@ -261,30 +268,124 @@ export class WormholeChapter implements Chapter {
   private *takeUsIn(): Generator<Wait> {
     const { ui } = this.s;
     this.stage = "approach";
-    yield ui.say("Cooper", "TARS, take us in. Nice and slow.");
     this.setShot(null);
-    this.atlas.autopilotWormhole();
-    yield ui.say("TARS", "Nice and slow is the only speed it allows.");
-    yield this.until(() => this.state.phase !== "outside", 120);
+    this.atlas.setHostView("chase");
+    // How the display shows it: the metric's own optics, or the film's crystal ball.
+    yield ui.say("TARS", "Before we go in: how do you want the displays to render it?");
+    yield* this.choose([
+      "Physical: exactly what the geometry does to light",
+      "Cinematic: the passage the way the film showed it",
+    ]);
+    this.atlas.setLook(this.picked === 1);
+    ui.say("TARS", this.picked === 1 ? "Cinematic it is. K switches it at any time." : "Physical it is. K switches it at any time.");
+    yield 2.5;
+
+    yield ui.say("Cooper", "I'll take her in myself.");
+    yield ui.say("TARS", "Line us up on the centre and keep it slow. Say the word and I'll fly it.");
+    this.flying = true;
+    this.atlas.setHostControls(true);
+    ui.prompt("T", "hand the controls to TARS");
+    // Cooper flies until the ship is in the sphere's field. If he asks, drifts far off, or
+    // hasn't gone in after a while, TARS lines it up.
+    const t0 = this.clock;
+    let nagged = false;
+    yield () => {
+      const f = this.atlas.saturnFrame;
+      const far = this.state.side === "solar" && f.ship.distanceTo(f.mouth) > 60;
+      if (!this.tars && (this.s.input.hit("KeyT") || far || this.clock - t0 > 100)) this.handOver(far ? "far" : "asked");
+      else if (!this.tars && !nagged && this.clock - t0 > 45) {
+        nagged = true;
+        ui.say("TARS", "The sphere is dead ahead of the reticle when you're lined up. Or I can take it.");
+      }
+      return this.state.phase !== "outside" || this.crossed;
+    };
+
     this.stage = "crossing";
     ui.clearLines();
     ui.say("Doyle", "We're in its field. Instruments are going strange.");
-    yield this.until(() => this.state.phase === "throat" || this.crossed, 60);
+    const inside = () => this.state.phase === "throat" || this.crossed;
+    // Into the throat, or back out if the line-up was off; then TARS brings her round.
+    yield this.until(() => inside() || this.state.phase === "outside", 45);
+    if (!inside()) {
+      if (!this.tars) this.handOver(this.state.phase === "outside" ? "missed" : "stalled");
+      yield this.until(inside, 120);
+    }
+    if (!inside()) {
+      // Never let the script run on without the ship: cut through as a skip would.
+      yield* this.skipped();
+      return;
+    }
+
+    // The middle: the shaking stops, the noise falls away, and the view goes aboard.
     ui.clearLines();
+    this.atlas.setHostView("cockpit");
     ui.say("Brand", "Everyone hold on.");
-    yield this.until(() => this.state.they > 0.3 || this.crossed, 20);
-    ui.say("Brand", "Did you feel that? Something passed through us.");
+    yield this.until(() => this.state.they > 0.2 || this.crossed, 12);
+    ui.clearLines();
+    ui.say("Brand", "Wait. There's something here with us.");
+    yield this.until(() => this.state.they > 0.8 || this.crossed, 4);
+    ui.say("Brand", "(She lifts her hand to it, and the air ripples round her fingers.)");
+    yield this.until(() => this.state.they < 0.15 || this.crossed, 6);
+    ui.say("Cooper", "Brand?");
+    yield ui.say("Brand", "I think that was a handshake.");
+    // Keep going if the pilot stopped to look; TARS brings her through the rest of the way.
+    if (!this.crossed && !this.tars) {
+      yield this.until(() => this.crossed, 25);
+      if (!this.crossed) this.handOver("stalled");
+    }
     yield this.until(() => this.crossed, 60);
+    this.atlas.setHostView("chase");
     yield this.until(() => this.state.phase === "emerging" || this.state.phase === "outside", 30);
     this.stage = "through";
     ui.say("TARS", "Coming out the other side.");
+    if (!this.tars) {
+      // Out the far side at the pilot's pace, then TARS brings her about to face the new sky.
+      yield this.until(() => this.state.phase === "outside", 40);
+      this.handOver("through");
+    }
     yield this.until(() => this.state.phase === "outside", 60);
     yield* this.emerged();
+  }
+  /** TARS takes the controls (asked, the pilot drifted off, or stalled in the throat). */
+  private handOver(why: "asked" | "far" | "missed" | "stalled" | "through") {
+    if (this.tars) return;
+    this.tars = true;
+    this.flying = false;
+    this.s.ui.prompt(null);
+    this.atlas.setHostControls(false);
+    this.atlas.autopilotWormhole();
+    if (why === "through") return;
+    this.s.ui.say(
+      "TARS",
+      why === "asked"
+        ? "I have it."
+        : why === "far"
+          ? "We're drifting off. I have the controls."
+          : why === "missed"
+            ? "We slid off the edge of it. I'll bring us round."
+            : "I have it. Better not to linger in here.",
+    );
+  }
+  private *choose(options: string[]): Generator<Wait> {
+    const { ui, input } = this.s;
+    this.picked = -1;
+    ui.choice(options);
+    yield () => {
+      options.forEach((_, i) => {
+        if (this.picked < 0 && input.hit(`Digit${i + 1}`, `Numpad${i + 1}`)) this.picked = i;
+      });
+      return this.picked >= 0;
+    };
+    ui.choice(null);
   }
   /** A skipped crossing: cut through black to just beyond Gargantua's mouth. */
   private *skipped(): Generator<Wait> {
     const { ui } = this.s;
     ui.clearLines();
+    ui.prompt(null);
+    ui.choice(null);
+    this.flying = false;
+    this.tars = true;
     this.clearOverlays();
     yield ui.fade(1, 0.6);
     this.setShot(null);
@@ -306,7 +407,7 @@ export class WormholeChapter implements Chapter {
     ui.end(
       "Chapter six complete",
       "The Wormhole",
-      "Two years to Saturn, then through the sphere and out under another galaxy's sky. (The piloted crossing is in production.)",
+      "Two years to Saturn, then through the sphere by hand and out under another galaxy's sky.",
       [
         ["On to Miller ▶", () => this.s.play("miller")],
         ["Replay chapter", () => this.s.restart(false)],

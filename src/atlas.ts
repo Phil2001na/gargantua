@@ -512,6 +512,7 @@ export class Atlas {
         uCine: { value: 0 },
         uTime: { value: 0 },
         uThey: { value: 0 },
+        uTheyP: { value: 0 },
       },
     });
     this.lens = new THREE.Mesh(new THREE.SphereGeometry(RZ, 96, 64), this.lensMaterial);
@@ -1046,6 +1047,21 @@ export class Atlas {
   /** Fly the Endurance through the bridge on autopilot (hosted chapters). */
   autopilotWormhole() {
     this.goWormhole();
+    // Taking over part-way: carry on out if we're already through, or just come about beyond it.
+    const ap = this.autopilot;
+    if (ap?.kind !== "wormhole" || this.ship.side !== "gargantua") return;
+    ap.phase = this.ship.zone ? "exit" : "settle";
+  }
+  /** Hosted chapters choose the look (the player can still flip it with K while flying). */
+  setLook(cinematic: boolean) {
+    if (this.hostedBy) this.setCinematic(cinematic);
+  }
+  /** Hosted chapters can put the camera aboard (the cockpit) or back behind the ship. */
+  setHostView(view: "chase" | "hull" | "cockpit") {
+    if (this.hostedBy) this.setView(view);
+  }
+  get hostView() {
+    return this.view;
   }
   /**
    * A hosted chapter frames its own shot: the world camera sits at `pos` looking along `quat`
@@ -1317,6 +1333,10 @@ export class Atlas {
     let cap = THREE.MathUtils.clamp(this.clearance(s.side, s.pos, 0) * 0.45, 0.05, 260);
     const r = s.zone ? radiusAt(s.zone.l) : s.pos.distanceTo(this.bridge.mouths[s.side]);
     cap = Math.min(cap, 0.55 * r + 0.25);
+    // In the story the middle of the throat is a held breath: the ship all but drifts through.
+    if (this.hostedBy && s.zone) cap *= THREE.MathUtils.lerp(0.2, 1, THREE.MathUtils.smoothstep(s.zone.l, A * 0.6, L1));
+    // Flying it by hand in the story: an approach speed, not a cruise.
+    if (this.hostedBy?.controls && !s.zone) cap = Math.min(cap, 2.5);
     return cap;
   }
   private turnToward(dir: THREE.Vector3, dt: number, rate = 1) {
@@ -1419,6 +1439,15 @@ export class Atlas {
         // Flight assist trims sideways drift so the ship carries its momentum into turns.
         const along = forward.clone().multiplyScalar(s.vel.dot(forward));
         s.vel.sub(along).multiplyScalar(Math.exp(-dt * 0.9)).add(along);
+      }
+      // Hosted, the sphere draws a hand-flown ship in: close to the mouth its heading bends
+      // toward the centre, so a rough line-up goes through instead of grazing past.
+      if (this.hostedBy?.controls && s.side === "solar" && !this.zoneCrossed) {
+        const mouth = this.bridge.mouths.solar;
+        const inward = s.zone ? s.zone.n.clone().negate() : mouth.clone().sub(s.pos);
+        const near = s.zone || (inward.length() < RZ * 6 && s.vel.dot(inward) > 0);
+        const speed = s.vel.length();
+        if (near && speed > 1e-4) s.vel.lerp(inward.normalize().multiplyScalar(speed), 1 - Math.exp(-dt * 1.4));
       }
     }
     // Soft speed limit: slower near worlds and inside the bridge.
@@ -1755,7 +1784,9 @@ export class Atlas {
     const nearThroat = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.5, L1 * 1.1) : 0;
     this.cine = THREE.MathUtils.damp(this.cine, this.cinematic ? 1 : 0, 2.5, dt);
     // The film's crossing buffets much harder.
-    this.shake = THREE.MathUtils.damp(this.shake, nearThroat * Math.min(1, this.ship.vel.length() / 1.2 + 0.25) * (1 + 1.6 * this.cine), 3, dt);
+    // The story's crossing is harder still: it's the first time, and nobody knows it's survivable.
+    const hostShake = this.hostedBy ? 1.4 : 1;
+    this.shake = THREE.MathUtils.damp(this.shake, nearThroat * Math.min(1, this.ship.vel.length() / 1.2 + 0.25) * (1 + 1.6 * this.cine) * hostShake, 3, dt);
     // Their ripple: once per crossing, as you pass the middle of the throat.
     if (z && z.l < A * 0.35 && !this.theyDone) {
       this.theyDone = true;
@@ -1773,6 +1804,7 @@ export class Atlas {
     lu.uCine.value = this.cine;
     lu.uTime.value = this.elapsed;
     lu.uThey.value = they;
+    lu.uTheyP.value = this.theyT >= 0 ? Math.min(1, this.theyT / 4) : 0;
     // Hosted, the story draws its own letterbox.
     this.root.classList.toggle("cine-bars", !this.hostedBy && this.cine > 0.5 && nearThroat > 0.05);
     this.ambience?.flight(this.ship.thrust, this.shake);
