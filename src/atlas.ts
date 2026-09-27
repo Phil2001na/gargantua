@@ -376,6 +376,10 @@ export class Atlas {
   private zoneCrossed = false;
   /** Story mode is driving the atlas (a chapter in space); `controls` lets the player fly. */
   private hostedBy: { controls: boolean } | null = null;
+  /** A hosted chapter's scripted camera (world pose on the camera's side), or null to fly the usual views. */
+  private hostShot: { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number } | null = null;
+  /** Saturn's main rings (their plane frames the arrival shots). */
+  private saturnRings: THREE.Mesh | null = null;
   /** True-scale landing sites on Miller and Mann. */
   private surface: Surface;
   private landing: { t: number; to: "surface" | "orbit"; id: SurfaceId; switched: boolean } | null = null;
@@ -868,18 +872,37 @@ export class Atlas {
       uv = geo.attributes.uv;
     for (let i = 0; i < p.count; i++)
       uv.setXY(i, (Math.hypot(p.getX(i), p.getY(i)) - r * inner) / (r * (outer - inner)), 0.5);
-    const ring = new THREE.Mesh(
-      geo,
-      new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        opacity: tilted ? 0.3 : 0.85,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      }),
-    );
+    const material = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: tilted ? 0.3 : 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    // The planet's shadow across the rings: a ray from each ring point to the Sun (at the origin).
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uPlanetR = { value: r };
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vRingW;\nvarying vec3 vRingC;")
+        .replace(
+          "#include <project_vertex>",
+          "#include <project_vertex>\nvRingW=(modelMatrix*vec4(transformed,1.)).xyz;\nvRingC=(modelMatrix*vec4(0.,0.,0.,1.)).xyz;",
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uPlanetR;\nvarying vec3 vRingW;\nvarying vec3 vRingC;")
+        .replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>
+          vec3 toSun=normalize(-vRingW);vec3 oc=vRingW-vRingC;
+          float b=dot(oc,toSun),h=b*b-dot(oc,oc)+uPlanetR*uPlanetR;
+          float shadow=b<0.?smoothstep(0.,uPlanetR*uPlanetR*.04,h):0.;
+          diffuseColor.rgb*=1.-.88*shadow;`,
+        );
+    };
+    const ring = new THREE.Mesh(geo, material);
     ring.rotation.x = tilted ? 0.25 : 1.12;
     group.add(ring);
+    if (!tilted) this.saturnRings = ring;
   }
   private addDebris(sector: Sector, inner: number, outer: number, count: number) {
     let seed = 733;
@@ -987,11 +1010,16 @@ export class Atlas {
     this.root.classList.add("atlas-hosted");
     this.root.classList.remove("atlas-clean");
     if (at === "beyond") this.placeBeyond();
+    // Compile every shader now (behind the chapter's opening fade) so the first sight of
+    // the rings, the sphere or Gargantua doesn't stall a frame for a second or more.
+    for (const scene of [this.scene, this.shipScene, this.gargSkyScene, this.gargCacheScene])
+      void this.renderer.compileAsync(scene, this.camera).catch(() => {});
   }
   /** Hand the canvas back to story mode (no exit to the observatory). */
   unhost() {
     if (!this.hostedBy) return;
     this.hostedBy = null;
+    this.setHostShot(null);
     this.active = false;
     this.autopilot = null;
     this.landing = null;
@@ -1018,6 +1046,55 @@ export class Atlas {
   /** Fly the Endurance through the bridge on autopilot (hosted chapters). */
   autopilotWormhole() {
     this.goWormhole();
+  }
+  /**
+   * A hosted chapter frames its own shot: the world camera sits at `pos` looking along `quat`
+   * (Saturn's side, outside the throat), and the ship is drawn from there. null hands the
+   * view back to the flight camera.
+   */
+  setHostShot(shot: { pos: THREE.Vector3; quat: THREE.Quaternion; fov?: number } | null) {
+    if (shot && !this.hostedBy) return;
+    this.hostShot = shot ? { pos: shot.pos.clone(), quat: shot.quat.clone(), fov: shot.fov ?? 50 } : null;
+    this.root.classList.toggle("atlas-shot", !!shot);
+    if (!shot) {
+      this.camQuat.copy(this.ship.quat);
+      this.lastQuat.copy(this.ship.quat);
+    }
+  }
+  /** Put the Endurance somewhere on Saturn's side, heading along `dir` at `speed` (hosted scripts). */
+  placeShip(pos: THREE.Vector3, dir: THREE.Vector3, speed = 0) {
+    if (!this.hostedBy) return;
+    const s = this.ship;
+    s.side = "solar";
+    s.zone = null;
+    this.zoneCrossed = false;
+    this.autopilot = null;
+    s.pos.copy(pos);
+    s.vel.copy(dir).setLength(speed);
+    s.ang.set(0, 0, 0);
+    s.quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, pos.clone().add(dir), new THREE.Vector3(0, 1, 0)));
+    if (!this.hostShot) {
+      this.camQuat.copy(s.quat);
+      this.lastQuat.copy(s.quat);
+    }
+  }
+  /** Where Saturn, its rings, the mouth and the ship are now (they drift along Saturn's orbit). */
+  get saturnFrame() {
+    const b = this.body("saturn")!;
+    const normal = new THREE.Vector3(0, 0, 1);
+    if (this.saturnRings) {
+      this.saturnRings.updateMatrixWorld();
+      normal.transformDirection(this.saturnRings.matrixWorld);
+    }
+    return {
+      centre: b.group.position.clone(),
+      radius: b.data.radius,
+      ringNormal: normal,
+      mouth: this.bridge.mouths.solar.clone(),
+      mouthRadius: RZ,
+      ship: this.ship.pos.clone(),
+      shipRadius: SHIP_R,
+    };
   }
   /** Read-only flight state for a hosted chapter's script. */
   get hostState() {
@@ -1499,6 +1576,19 @@ export class Atlas {
   /** Place the world camera (possibly on the other side of the throat from the ship). */
   private placeCamera(dt: number) {
     const s = this.ship;
+    const shot = this.hostShot;
+    if (shot && !s.zone) {
+      // A hosted chapter's framing: the ship pass sees the Endurance from the same point.
+      this.camSide = s.side;
+      this.camera.position.copy(shot.pos);
+      this.camera.quaternion.copy(shot.quat);
+      this.camZone = this.bridge.toZone(this.camSide, this.camera.position);
+      this.shipPivot.quaternion.copy(s.quat);
+      this.shipCamera.position.copy(shot.pos).sub(s.pos);
+      this.shipCamera.quaternion.copy(shot.quat);
+      this.endurance.group.visible = true;
+      return;
+    }
     if (this.view === "orbit") {
       this.camSide = s.side;
       this.camZone = null;
@@ -1703,11 +1793,12 @@ export class Atlas {
       this.view === "orbit"
         ? this.camera.position.distanceTo(this.controls.target) * 0.5
         : this.clearance(side, this.camera.position, this.camZone ? 0 : RZ);
-    this.camera.near = THREE.MathUtils.clamp(camClear * 0.3, 0.004, 2);
+    // A hosted shot can skim the rings, so it keeps a short near plane.
+    this.camera.near = this.hostShot ? 0.02 : THREE.MathUtils.clamp(camClear * 0.3, 0.004, 2);
     this.camera.updateProjectionMatrix();
     // Cinematic: a wider lens deep in the passage.
     const passage = this.camZone ? 1 - THREE.MathUtils.smoothstep(this.camZone.l, A, L1) : 0;
-    const fov = 50 + 14 * this.cine * passage;
+    const fov = this.hostShot?.fov ?? 50 + 14 * this.cine * passage;
     if (Math.abs(this.camera.fov - fov) > 0.01) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
@@ -1754,6 +1845,8 @@ export class Atlas {
     // Soft light from the camera side, like reflected light from the other craft.
     this.camLight.position.copy(this.shipCamera.position).normalize().add(new THREE.Vector3(0, 0.6, 0));
     this.updateDust(dt);
+    // Seen from a distance, the flight dust around the ship would hang in the frame.
+    this.dust.visible = !this.hostShot;
     this.shipPivot.visible = this.view !== "orbit";
 
     this.composer.render();

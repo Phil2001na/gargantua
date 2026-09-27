@@ -1,5 +1,11 @@
 # Project updates
 
+## 2026-09-27
+
+### 01:55
+- Chapter 6 A2: arrival at Saturn (wake from cryo, ring flyby with the planet's shadow on the rings, first sight of the sphere, Romilly's paper-fold explanation) before TARS flies it through. Started by the Agents Chat Claude, finished and verified here.
+- Atlas precompiles its shaders when a chapter hosts it, removing 1–3 s stalls at shot cuts.
+
 ## 2026-09-26
 ### 23:55
 - Story mode can host the atlas (TASKS A1): `Atlas.host()` opens it under story control with only the flight readout showing, gates its keys (story owns Escape, Space and menus), and exposes read-only crossing state (side, throat ℓ, phase, crossings, "they" ripple). `Story.host()` makes the story frame update and draw through the atlas; the chapter ending unhosts it.

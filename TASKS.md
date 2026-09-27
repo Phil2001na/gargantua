@@ -53,7 +53,7 @@ skip. No second wormhole renderer.
   that opens near Saturn and flies the autopilot through, with a subtitle at each phase.
   *Done when:* menu → 06 → the Endurance crosses with story subtitles, Esc/pause and hold-Space
   skip work, and the chapter ends cleanly back to the menu.
-- [ ] **A2. Arrival at Saturn.** Opening: cryo pods (simple interior or a hull shot) and a time
+- [x] **A2. Arrival at Saturn.** *(2026-09-27: cryo frost, time card, ring pull-back + skim with the planet's shadow on the rings, push-in on the sphere, Romilly's paper-fold hologram; ~3 min to "take us in", skip cuts to the approach; 18–35 ms/frame on Intel UHD; shaders precompiled on host to avoid stalls at cuts.)* Opening: cryo pods (simple interior or a hull shot) and a time
   card ("Two years later"), wake-up lines, then a long cinematic rail past the rings (shadow
   on the rings, the ship tiny against them), then the first sight of the sphere: a slow push-in
   where it reads as a hole in the sky. Original dialogue: the "why a sphere" explanation (a

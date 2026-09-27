@@ -508,3 +508,7 @@
 .atlas-hosted .flight-hud {
   opacity: 0.8;
 }
+/* A hosted chapter is framing its own shot: no flight readout. */
+.atlas-hosted.atlas-shot .flight-hud {
+  display: none;
+}
