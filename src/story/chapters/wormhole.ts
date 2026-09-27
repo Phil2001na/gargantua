@@ -42,6 +42,8 @@ export class WormholeChapter implements Chapter {
   /** The player has the stick; `tars` once TARS has taken it back. */
   private flying = false;
   private tars = false;
+  /** Cooper still had the stick when the ship crossed the middle. */
+  private handFlown = false;
   private picked = -1;
   constructor(private s: Story) {}
 
@@ -51,7 +53,7 @@ export class WormholeChapter implements Chapter {
     this.atlas = this.s.host("saturn");
     this.base = this.atlas.hostState.crossings;
     this.clock = 0;
-    this.flying = this.tars = false;
+    this.flying = this.tars = this.handFlown = false;
     this.s.cinematicMode = true;
     this.s.input.capture(false);
     this.s.run(() => (checkpoint === "approach" ? this.fromApproach() : this.arrival()));
@@ -76,6 +78,9 @@ export class WormholeChapter implements Chapter {
   }
   update(dt: number) {
     this.clock += dt;
+    if (this.flying && !this.handFlown && this.crossed) this.handFlown = true;
+    // T hands the stick to TARS at any point while Cooper is flying (even deep in the throat).
+    if (this.flying && !this.tars && this.s.input.hit("KeyT")) this.handOver("asked");
     if (this.shot) this.atlas.setHostShot(this.shot(this.clock - this.shotStart));
   }
 
@@ -292,7 +297,7 @@ export class WormholeChapter implements Chapter {
     yield () => {
       const f = this.atlas.saturnFrame;
       const far = this.state.side === "solar" && f.ship.distanceTo(f.mouth) > 60;
-      if (!this.tars && (this.s.input.hit("KeyT") || far || this.clock - t0 > 100)) this.handOver(far ? "far" : "asked");
+      if (!this.tars && (far || this.clock - t0 > 100)) this.handOver(far ? "far" : "asked");
       else if (!this.tars && !nagged && this.clock - t0 > 45) {
         nagged = true;
         ui.say("TARS", "The sphere is dead ahead of the reticle when you're lined up. Or I can take it.");
@@ -337,10 +342,11 @@ export class WormholeChapter implements Chapter {
     this.atlas.setHostView("chase");
     yield this.until(() => this.state.phase === "emerging" || this.state.phase === "outside", 30);
     this.stage = "through";
-    ui.say("TARS", "Coming out the other side.");
+    // A fast pilot can be clear of the mouth before Brand has finished; don't call it late.
+    if (this.state.phase !== "outside") ui.say("TARS", "Coming out the other side.");
     if (!this.tars) {
       // Out the far side at the pilot's pace, then TARS brings her about to face the new sky.
-      yield this.until(() => this.state.phase === "outside", 40);
+      yield this.until(() => this.state.phase === "outside", 12);
       this.handOver("through");
     }
     yield this.until(() => this.state.phase === "outside", 60);
@@ -386,6 +392,7 @@ export class WormholeChapter implements Chapter {
     ui.choice(null);
     this.flying = false;
     this.tars = true;
+    this.atlas.setHostControls(false);
     this.clearOverlays();
     yield ui.fade(1, 0.6);
     this.setShot(null);
@@ -396,6 +403,7 @@ export class WormholeChapter implements Chapter {
   }
   private *emerged(): Generator<Wait> {
     const { ui } = this.s;
+    const byHand = this.handFlown;
     this.stage = "through";
     yield ui.say("Romilly", "That's not our sky.");
     yield this.until(() => this.state.autopilot === null, 25);
@@ -407,7 +415,7 @@ export class WormholeChapter implements Chapter {
     ui.end(
       "Chapter six complete",
       "The Wormhole",
-      "Two years to Saturn, then through the sphere by hand and out under another galaxy's sky.",
+      `Two years to Saturn, then through the sphere ${byHand ? "by hand" : "with TARS at the controls"} and out under another galaxy's sky.`,
       [
         ["On to Miller ▶", () => this.s.play("miller")],
         ["Replay chapter", () => this.s.restart(false)],

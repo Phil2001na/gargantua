@@ -2,6 +2,10 @@
 
 ## 2026-09-27
 
+### 23:54
+- Chapter 6 A3 finished and verified: the piloted crossing plays end to end in both looks (by hand, by TARS, TARS taking over mid-way, K mid-way, skip in the throat).
+- Fixes: T hands over at any point (it was ignored once inside the field), K works while TARS flies, a skipped crossing takes the stick back, a drifting pilot is brought out after 12 s instead of 40, and the end card says who flew it.
+
 ### 01:55
 - Chapter 6 A2: arrival at Saturn (wake from cryo, ring flyby with the planet's shadow on the rings, first sight of the sphere, Romilly's paper-fold explanation) before TARS flies it through. Started by the Agents Chat Claude, finished and verified here.
 - Atlas precompiles its shaders when a chapter hosts it, removing 1–3 s stalls at shot cuts.

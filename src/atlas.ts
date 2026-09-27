@@ -661,7 +661,9 @@ export class Atlas {
       // Hosted, story mode owns Escape, Space and the menus; the player only gets the stick.
       if (this.hostedBy) {
         const k = e.key.toLowerCase();
-        if (!this.hostedBy.controls || !(HOSTED_KEYS.includes(k) || k.startsWith("arrow"))) return;
+        // The look (K) stays the player's even while TARS or the script has the stick.
+        const always = k === "k";
+        if (!always && (!this.hostedBy.controls || !(HOSTED_KEYS.includes(k) || k.startsWith("arrow")))) return;
       }
       if (e.key === "Escape") {
         this.root.classList.remove("atlas-clean");

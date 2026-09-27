@@ -59,7 +59,7 @@ skip. No second wormhole renderer.
   where it reads as a hole in the sky. Original dialogue: the "why a sphere" explanation (a
   hologram fold of paper and pencil, drawn as a simple overlay or 3D sheet).
   *Done when:* 2–3 minutes from wake-up to "take us in", skippable, measured on Intel UHD.
-- [ ] **A3. The crossing, piloted.** Cooper flies the approach by hand (or TARS on `T`),
+- [x] **A3. The crossing, piloted.** *(2026-09-27: verified headless on Intel UHD in both looks: TARS-flown, hand-flown, T mid-way, K mid-way, hold-Space skip in the throat; handshake lines land on the wavefront, cockpit in the throat, chase after, no hull clipping; 37–60 fps. Fixed: T and K now work at any point, skip takes the stick back, no late "coming out" line.)* Cooper flies the approach by hand (or TARS on `T`),
   with a choice before entry: **Physical** or **Cinematic** look (K still toggles mid-way).
   Phase-driven lines (entering / inside / emerging), harder buffeting, the silence in the
   middle, and "their" handshake: the ripple passes through the cabin and Brand reaches toward
