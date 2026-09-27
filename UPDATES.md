@@ -1,5 +1,10 @@
 # Project updates
 
+## 2026-09-28
+### 00:35
+- Sky is now the real Milky Way: NASA SVS Deep Star Maps 2020 (Gaia DR2) diffuse map, baked to 4K/8K sRGB JPEGs in `public/textures`. It swaps in place over the procedural band (`src/sky.ts`), so every renderer (observatory, atlas, wormhole lens) gets it and it lenses correctly; desktop GPUs load 8K, phones 4K. Point stars stay procedural so they stay sharp under lensing.
+- Story mode pause menu: "Graphics: Adaptive / High (locked)" holds full resolution, MSAA and bloom (also in the hosted atlas via new `Atlas.setQuality`); remembered in localStorage.
+
 ## 2026-09-27
 
 ### 01:55

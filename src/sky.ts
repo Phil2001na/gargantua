@@ -1,7 +1,36 @@
 import * as THREE from "three";
 
-// Seeded, seamless diffuse galactic light. Point stars are procedural in the
+// Diffuse galactic light, in galactic coordinates. It starts as a seeded procedural band
+// and is swapped in place for the real Milky Way (Gaia, via NASA's Deep Star Maps: the
+// diffuse glow with the stars removed) once it loads. Point stars stay procedural in the
 // shaders (see shaders/stars.glsl) so they stay sharp and lens correctly.
+//
+// The photo files store linear light x SKY_BAKE, sRGB-encoded; uSkyGain undoes the bake
+// and applies SKY_EXPOSURE, a dark-adapted eye's view of the band rather than a light meter's.
+const SKY_BAKE = 4;
+const SKY_EXPOSURE = 4;
+const skyGain = { value: 1 };
+
+/** Quality tier asked for the sky photo: "high" upgrades to the 8K map where the GPU allows. */
+let skyTexture: THREE.CanvasTexture | null = null;
+let skyLoaded = 0;
+export function setSkyDetail(high: boolean, renderer?: THREE.WebGLRenderer) {
+  const max = renderer?.capabilities.maxTextureSize ?? 4096;
+  const want = high && max >= 8192 && !matchMedia("(pointer: coarse)").matches ? 8 : 4;
+  if (!skyTexture || want <= skyLoaded) return;
+  const tex = skyTexture;
+  const img = new Image();
+  img.decoding = "async";
+  img.onload = () => {
+    if (want <= skyLoaded) return;
+    skyLoaded = want;
+    tex.image = img;
+    tex.needsUpdate = true;
+    skyGain.value = SKY_EXPOSURE / SKY_BAKE;
+  };
+  img.src = `${import.meta.env.BASE_URL}textures/milkyway_${want}k.jpg`;
+}
+
 export function createSky(): THREE.CanvasTexture {
   const w = 1024,
     h = 512,
@@ -63,6 +92,9 @@ export function createSky(): THREE.CanvasTexture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 4;
+  skyTexture = tex;
+  setSkyDetail(false);
   return tex;
 }
 
@@ -75,6 +107,7 @@ export function skyUniforms(sky: THREE.Texture, gargantua: boolean) {
     );
   return {
     uSky: { value: sky },
+    uSkyGain: skyGain,
     uPix: { value: 0.001 },
     uSkySeed: { value: gargantua ? 1 : 0 },
     uSkyRot: { value: rot },

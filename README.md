@@ -1,6 +1,8 @@
 # Gargantua
 
-An original, interactive black-hole experience inspired by Interstellar. Built with TypeScript, Three.js, GLSL, and Web Audio. All scene imagery is generated locally; there are no film assets or recordings.
+An original, interactive black-hole experience inspired by Interstellar. Built with TypeScript, Three.js, GLSL, and Web Audio. All scene imagery is generated locally except the Milky Way, which is the real sky; there are no film assets or recordings.
+
+Milky Way background (`public/textures/milkyway_*k.jpg`, galactic coordinates, stars removed): NASA/Goddard Space Flight Center Scientific Visualization Studio, [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851). Gaia DR2: ESA/Gaia/DPAC. Point stars stay procedural so they stay sharp and lens correctly.
 
 ## Run
 

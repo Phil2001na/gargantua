@@ -47,7 +47,7 @@ export class StoryUI {
       </section>
       <section class="sb-pause" hidden>
         <div class="sb-panel"><div class="sb-micro">Paused</div><h2 class="sb-pause-title"></h2>
-        <button data-act="resume">Resume</button><button data-act="checkpoint">Restart from checkpoint</button><button data-act="restart">Restart chapter</button><button data-act="menu">Chapters</button>
+        <button data-act="resume">Resume</button><button data-act="checkpoint">Restart from checkpoint</button><button data-act="restart">Restart chapter</button><button data-act="quality">Graphics: Adaptive</button><button data-act="menu">Chapters</button>
         <div class="sb-keys"></div></div>
       </section>
       <section class="sb-end" hidden>

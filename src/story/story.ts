@@ -129,6 +129,14 @@ export class Story {
   private frames = 0;
   private fpsT = 0;
   private quality: "low" | "mid" | "high" = "mid";
+  /** Player setting: hold full resolution and every effect instead of adapting to the frame rate. */
+  private lockHigh = (() => {
+    try {
+      return localStorage.getItem("gargantua.storyQuality") === "high";
+    } catch {
+      return false;
+    }
+  })();
   private shownFirstFrame = false;
   constructor(
     private renderer: THREE.WebGLRenderer,
@@ -265,12 +273,14 @@ export class Story {
     if (!this.hosting) {
       this.hosting = true;
       atlas.host(at);
+      if (this.lockHigh) atlas.setQuality("high");
     }
     return atlas;
   }
   unhost() {
     if (!this.hosting) return;
     this.hosting = false;
+    if (this.lockHigh) this.atlas?.setQuality("auto");
     this.atlas?.unhost();
     this.resize();
   }
@@ -309,15 +319,36 @@ export class Story {
     if (on) {
       this.input.capture(false);
       this.audio.silence();
+      this.syncQualityLock();
       this.ui.pause(this.chapter?.title ?? "", this.chapter?.keys ?? "", (act) => {
         if (act === "resume") {
           this.setPaused(false);
           if (!this.cine) this.input.capture(true);
         } else if (act === "checkpoint") this.restart(true);
         else if (act === "restart") this.restart(false);
+        else if (act === "quality") this.setLockHigh(!this.lockHigh);
         else this.toMenu();
       });
     } else this.ui.pause(null, "", () => {});
+  }
+  private setLockHigh(on: boolean) {
+    this.lockHigh = on;
+    try {
+      localStorage.setItem("gargantua.storyQuality", on ? "high" : "auto");
+    } catch {}
+    this.syncQualityLock();
+  }
+  private syncQualityLock() {
+    const b = document.querySelector<HTMLButtonElement>('.sb-pause [data-act="quality"]');
+    if (b) b.textContent = `Graphics: ${this.lockHigh ? "High (locked)" : "Adaptive"}`;
+    if (this.lockHigh) {
+      this.quality = "high";
+      if (this.renderScale !== 1) {
+        this.renderScale = 1;
+        this.resize();
+      }
+    }
+    if (this.hosting) this.atlas?.setQuality(this.lockHigh ? "high" : "auto");
   }
   /** Draw distance and effects for the current quality tier. */
   private applyQuality() {
@@ -403,7 +434,12 @@ export class Story {
     // Adaptive resolution: hold 50+ fps where possible.
     this.frames++;
     this.fpsT += raw;
-    if (this.fpsT > 2) {
+    if (this.fpsT > 2 && this.lockHigh) {
+      this.syncQualityLock();
+      this.fps = this.frames / this.fpsT;
+      this.frames = 0;
+      this.fpsT = 0;
+    } else if (this.fpsT > 2) {
       this.fps = this.frames / this.fpsT;
       this.frames = 0;
       this.fpsT = 0;

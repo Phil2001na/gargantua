@@ -563,12 +563,7 @@ export class Atlas {
     quality.setAttribute("aria-label", "Atlas render quality");
     quality.innerHTML =
       '<option value="auto">Adaptive quality</option><option value="high">Cinematic quality</option><option value="low">Performance quality</option>';
-    quality.onchange = () => {
-      this.adaptiveQuality = quality.value === "auto";
-      this.renderScale = quality.value === "high" ? 1 : quality.value === "low" ? 0.5 : 0.75;
-      this.setMultisampling(quality.value === "high");
-      this.resize();
-    };
+    quality.onchange = () => this.setQuality(quality.value as "auto" | "high" | "low");
     this.root.querySelector(".atlas-tools")!.prepend(quality);
     const restore = document.createElement("button");
     restore.className = "atlas-restore";
@@ -1053,6 +1048,15 @@ export class Atlas {
     ap.phase = this.ship.zone ? "exit" : "settle";
   }
   /** Hosted chapters choose the look (the player can still flip it with K while flying). */
+  /** Adaptive resolution, or pinned at full (Cinematic) or half (Performance) resolution. */
+  setQuality(mode: "auto" | "high" | "low") {
+    this.adaptiveQuality = mode === "auto";
+    this.renderScale = mode === "high" ? 1 : mode === "low" ? 0.5 : 0.75;
+    this.setMultisampling(mode === "high");
+    const select = this.root.querySelector<HTMLSelectElement>(".atlas-tools select");
+    if (select) select.value = mode;
+    this.resize();
+  }
   setLook(cinematic: boolean) {
     if (this.hostedBy) this.setCinematic(cinematic);
   }

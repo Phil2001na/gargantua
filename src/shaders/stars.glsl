@@ -2,6 +2,7 @@
 // Point stars are generated per pixel from the final ray direction, so they stay
 // pin-sharp at any resolution and are displaced correctly by gravitational lensing.
 uniform sampler2D uSky;   // diffuse galactic light only (no baked stars)
+uniform float uSkyGain;   // undoes the brightness baked into the sky photo
 uniform float uPix;       // angular size of one pixel, radians
 uniform float uSkySeed;   // 0 = our sky, 1 = Gargantua's sky
 uniform mat3 uSkyRot;     // orientation of the galactic plane
@@ -65,7 +66,7 @@ vec3 starLayer(vec3 d, float cells, float seed, float gain, float sizeMul) {
 }
 vec3 st_band(vec3 d) {
   vec2 uv = vec2(atan(d.z, d.x) / 6.28318531 + .5, asin(clamp(d.y, -1., 1.)) / 3.14159265 + .5);
-  return texture2D(uSky, uv).rgb;
+  return texture2D(uSky, uv).rgb * uSkyGain;
 }
 // Point stars for a direction already in the sky's galactic frame; denser along the band.
 vec3 st_stars(vec3 d, float seed, vec3 band) {
