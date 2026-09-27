@@ -30,6 +30,11 @@ uniform float uTime;
 uniform float uThey;
 // How far their wavefront has swept past the camera (0 = ahead, 1 = gone behind).
 uniform float uTheyP;
+// Cinematic passage: the entry flash (0 = none, then 0..1 as it runs), how far the exit
+// has come up ahead (0..1), and which way along the throat normal is ahead (+1 or -1).
+uniform float uFlash;
+uniform float uExit;
+uniform float uAhead;
 
 float drdl(float l) {
   float L = abs(l);
@@ -60,26 +65,72 @@ vec3 environment(samplerCube map, float solar, vec3 dir) {
   }
   return o.rgb + sky * (1. - o.a);
 }
-float lh(float n) { return fract(sin(n) * 43758.5453); }
-float ln1(float x) { float i = floor(x), f = fract(x); f = f * f * (3. - 2. * f); return mix(lh(i), lh(i + 1.), f); }
-// The film's passage: lanes of light streaming past along the throat, rippling.
+// --- The film's passage (cinematic look only) ---------------------------------------
+// Lanes of light made from the real skies at either end of the throat: each azimuth around
+// the tunnel reads one great circle of that sky, stretched along the tunnel and scrolling
+// toward the camera, so the far galaxy's stars and glow stream past as motion-blurred lanes.
+// Diffuse light only (worlds and glow), for a lane sample.
+vec3 laneGlow(samplerCube map, float solar, vec3 dir) {
+  vec4 o = textureCube(map, dir);
+  vec3 sky = solar > .5 ? skyBand(dir) : textureCube(uGargSky, dir).rgb;
+  return o.rgb + sky * (1. - o.a);
+}
+// One of the sky's star layers (same cells and hash as starLayer, so the same stars),
+// drawn as streaks along `td`, red leading and blue trailing: the spectral fringe.
+vec3 streakLayer(vec3 d, vec3 td, float cells, float seed, float gain, float sp, float sa) {
+  vec3 a = abs(d);
+  vec2 uv;
+  float face;
+  if (a.x >= a.y && a.x >= a.z) { uv = d.yz / a.x; face = d.x > 0. ? 0. : 1.; }
+  else if (a.y >= a.z) { uv = d.xz / a.y; face = d.y > 0. ? 2. : 3.; }
+  else { uv = d.xy / a.z; face = d.z > 0. ? 4. : 5.; }
+  vec2 id = floor((uv * .5 + .5) * cells);
+  vec3 h = st_hash3(vec3(id + seed * 131.7, face * 17. + seed * 3.1));
+  vec2 uc = (id + .15 + .7 * h.xy) / cells * 2. - 1.;
+  float sg = face == 0. || face == 2. || face == 4. ? 1. : -1.;
+  vec3 dc = face < 2. ? vec3(sg, uc) : face < 4. ? vec3(uc.x, sg, uc.y) : vec3(uc, sg);
+  vec3 delta = normalize(dc) - d;
+  float x = dot(delta, td);
+  float across = exp(-max(dot(delta, delta) - x * x, 0.) / (2. * sp * sp));
+  float k = -.5 / (sa * sa), o = sa * .7;
+  vec3 I = vec3(exp(k * (x - o) * (x - o)), exp(k * x * x), exp(k * (x + o) * (x + o)));
+  float temp = fract(h.z * 37.1 + h.x * 11.3);
+  vec3 tint = temp < .22 ? vec3(.66, .76, 1.) : temp > .8 ? vec3(1., .8, .58) : vec3(.96, .95, 1.);
+  return tint * I * across * pow(h.z, 5.) * gain;
+}
 vec3 lanes(vec3 d, vec3 n) {
-  vec3 e1 = normalize(cross(n, abs(n.y) < .9 ? vec3(0, 1, 0) : vec3(1, 0, 0)));
-  vec3 e2 = cross(n, e1);
-  float along = dot(d, n);
-  float az = atan(dot(d, e2), dot(d, e1));
-  // Depth along the tunnel: rushes toward the camera, faster near the walls.
-  float depth = abs(along) / max(1. - abs(along), .02);
-  float s = depth * 1.5 - uTime * 9.;
-  az += .08 * sin(s * .7 + uTime * 1.3) + .03 * sin(az * 9. + uTime * 2.);
-  float k = az * 44. / PI;
-  float lane = ln1(k) * ln1(k * 2.3 + 7.);
-  lane = pow(lane, 2.5) * 3.;
-  // Each lane is a train of long dashes rushing past.
-  float streak = smoothstep(.15, 1., .5 + .5 * sin(s * 1.3 + lh(floor(k)) * 40.));
-  float wall = 1. - smoothstep(.6, .99, abs(along));
-  vec3 warm = vec3(1., .8, .52), cool = vec3(.55, .75, 1.);
-  return mix(cool, warm, lh(floor(k) + 3.)) * lane * streak * wall * 1.8;
+  float al = dot(d, n);
+  // Looking down the tunnel toward the far side (al < 0) you see that side's sky; back
+  // toward the mouth you came in by, your own.
+  bool far = al < 0.;
+  vec3 ax = far ? -n : n;
+  vec3 e1 = normalize(cross(ax, abs(ax.y) < .9 ? vec3(0, 1, 0) : vec3(1, 0, 0)));
+  vec3 e2 = cross(ax, e1);
+  float az = atan(dot(d, e2), dot(d, e1)) + uTime * .04;
+  float depth = abs(al) / max(1. - abs(al), .002);
+  // Position along each lane: log depth, so the stream speeds up toward the walls.
+  float w = .12 * log(depth + .05) + uTime * .22;
+  // The lanes ripple a little as they stream, like light through moving water.
+  az += .03 * sin(w * 38. + az * 3. + uTime * 1.7);
+  vec3 u = cos(az) * e1 + sin(az) * e2;
+  vec3 v = ax * .88 + (cos(az) * e2 - sin(az) * e1) * .475;
+  vec3 q = cos(w) * u + sin(w) * v;
+  vec3 td = cos(w) * v - sin(w) * u;
+  float sp = max(length(fwidth(q)) * .6, 2e-4);
+  // Into the other side's frame through the bridge's pairing of directions.
+  float solar = far ? uRemoteSolar : uLocalSolar;
+  vec3 glow;
+  if (far) {
+    q = uMirror * q;
+    td = uMirror * td;
+    glow = laneGlow(uRemote, solar, q);
+  } else glow = laneGlow(uLocal, solar, q);
+  mat3 fr = solar > .5 ? uSkyRot : mat3(1.);
+  vec3 sq = normalize(fr * q), st = fr * td;
+  float seed = solar > .5 ? uSkySeed : 1.;
+  vec3 stars = streakLayer(sq, st, 24., seed, 7., sp, .017) + streakLayer(sq, st, 64., seed + 7., 1.3, sp, .006);
+  float wall = 1. - smoothstep(.55, .985, abs(al));
+  return (glow * 2.2 + stars) * wall;
 }
 void main() {
   vec3 d = normalize(vWorld - cameraPosition);
@@ -148,7 +199,21 @@ void main() {
     if (uInside > .5) {
       float tunnel = 1. - smoothstep(uA, uL1, abs(uCamL));
       float t = tunnel * uCine;
-      gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * .35 + lanes(d, uCamN), t * .9);
+      // The exit: a disc of the new sky ahead that grows and brightens as it nears.
+      float ahead = acos(clamp(dot(d, uCamN * uAhead), -1., 1.));
+      float rad = mix(.1, .5, uExit);
+      float disc = (1. - smoothstep(rad * .6, rad, ahead)) * uExit;
+      gl_FragColor.rgb *= 1. + disc * uCine * .7;
+      if (t > 0.) gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * .4 + lanes(d, uCamN), t * .92 * (1. - disc));
+    }
+    // Entry splash: the sphere's surface sweeps over the frame as a bright expanding ring.
+    if (uFlash > 0.) {
+      vec3 fw = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+      float ang = acos(clamp(dot(d, fw), -1., 1.));
+      float fade = 1. - uFlash;
+      float fx = ang - uFlash * 1.5;
+      float ring = exp(-fx * fx / .006) * fade * fade;
+      gl_FragColor.rgb += vec3(.8, .88, 1.) * (ring * 1.1 + .12 * fade * fade * fade) * uCine;
     }
   }
   // The front itself glows faintly, like a heat shimmer catching the light.

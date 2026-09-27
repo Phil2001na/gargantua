@@ -65,7 +65,7 @@ skip. No second wormhole renderer.
   middle, and "their" handshake: the ripple passes through the cabin and Brand reaches toward
   it (a cockpit-view moment; an abstract distortion, not a figure).
   *Done when:* both looks play end to end with no desync, and the camera never clips the hull.
-- [ ] **A4. Make the passage look like the film.** Upgrade `shaders/lens.frag` cinematic mode:
+- [x] **A4. Make the passage look like the film.** *(2026-09-28: lanes built from both real skies (same stars as the sky, streaked, rippling, fringed), ring flash on entry, growing exit disc + short bloom surge, Saturn's lensed images read on approach; roar/organ in, hush, swell out. +0.85 ms vs the old cinematic in the throat on Intel UHD at 1280×720; physical path untouched.)* Upgrade `shaders/lens.frag` cinematic mode:
   - light lanes built from the *actual* lensed destination sky, stretched along the throat
     (motion-blurred galaxy, not procedural noise), with the exit growing ahead as a bright disc;
   - entry "splash": the sphere's surface engulfs the frame with a brief ring flash;

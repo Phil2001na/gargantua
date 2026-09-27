@@ -82,6 +82,14 @@ export class WormholeChapter implements Chapter {
     // T hands the stick to TARS at any point while Cooper is flying (even deep in the throat).
     if (this.flying && !this.tars && this.s.input.hit("KeyT")) this.handOver("asked");
     if (this.shot) this.atlas.setHostShot(this.shot(this.clock - this.shotStart));
+    if (this.stage !== "arrival" && this.stage !== "end") {
+      // The crossing's sound: a roar and a rising organ in, near silence in the middle, and
+      // the organ swelling as the new sky opens up.
+      const p = this.state.passage;
+      const quiet = 1 - 0.92 * p.hush;
+      this.s.audio.rumble((0.06 + 0.7 * p.entry + 0.3 * p.swell) * quiet, 0.5);
+      this.s.audio.padLevel(Math.min(1.1, 0.12 + 0.45 * p.entry + 1.1 * p.swell) * quiet, 1);
+    }
   }
 
   private get state() {

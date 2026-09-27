@@ -372,6 +372,11 @@ export class Atlas {
   private theyT = -1;
   private theyDone = false;
   private theyNow = 0;
+  /** The film's passage: entry flash time (−1 idle), and the sound/light envelope of a crossing. */
+  private flashT = -1;
+  private flashDone = false;
+  private passage = { entry: 0, hush: 0, swell: 0 };
+  private bloom!: UnrealBloomPass;
   /** True from the moment the ship changes sides until it leaves the lens region. */
   private zoneCrossed = false;
   /** Story mode is driving the atlas (a chapter in space); `controls` lets the player fly. */
@@ -410,7 +415,8 @@ export class Atlas {
     shipPass.clear = false;
     shipPass.clearDepth = true;
     this.composer.addPass(shipPass);
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.45, 1.15));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.45, 1.15);
+    this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.fxaa);
     for (const data of worlds) this.createBody(data);
@@ -513,6 +519,9 @@ export class Atlas {
         uTime: { value: 0 },
         uThey: { value: 0 },
         uTheyP: { value: 0 },
+        uFlash: { value: 0 },
+        uExit: { value: 0 },
+        uAhead: { value: -1 },
       },
     });
     this.lens = new THREE.Mesh(new THREE.SphereGeometry(RZ, 96, 64), this.lensMaterial);
@@ -1132,6 +1141,8 @@ export class Atlas {
       they: this.theyNow,
       autopilot: ap?.kind === "wormhole" ? ap.phase : ap ? "body" : null,
       cinematic: this.cinematic,
+      /** Envelope of the crossing for sound: roar rising in, hush in the middle, swell out. */
+      passage: { ...this.passage },
     };
   }
   /** Just through on Gargantua's side, heading out of the mouth (a skipped crossing). */
@@ -1785,6 +1796,8 @@ export class Atlas {
     const z = this.ship.zone;
     const nearThroat = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.5, L1 * 1.1) : 0;
     this.cine = THREE.MathUtils.damp(this.cine, this.cinematic ? 1 : 0, 2.5, dt);
+    // Snap the tail of a switch back to physical, so the physical look pays nothing for the film's.
+    if (!this.cinematic && this.cine < 0.003) this.cine = 0;
     // The film's crossing buffets much harder.
     // The story's crossing is harder still: it's the first time, and nobody knows it's survivable.
     const hostShake = this.hostedBy ? 1.4 : 1;
@@ -1807,6 +1820,38 @@ export class Atlas {
     lu.uTime.value = this.elapsed;
     lu.uThey.value = they;
     lu.uTheyP.value = this.theyT >= 0 ? Math.min(1, this.theyT / 4) : 0;
+    // The film's passage. Entry: a flash as the ship goes deep into the sphere. Exit: the new
+    // sky grows ahead as a bright disc and the bloom surges as the ship comes out.
+    const crossed = this.zoneCrossed;
+    // The flash fires when the camera goes into the sphere (see placeCamera's camZone).
+    if (this.camZone && z && !crossed && !this.flashDone) {
+      this.flashDone = true;
+      this.flashT = 0;
+    }
+    if (!z && !this.camZone) this.flashDone = false;
+    if (this.flashT >= 0) {
+      this.flashT += step / 1.3;
+      if (this.flashT >= 1) this.flashT = -1;
+    }
+    const flash = Math.max(this.flashT, 0);
+    lu.uFlash.value = this.flashT >= 0 ? Math.max(flash, 1e-3) : 0;
+    const exit = z && crossed ? THREE.MathUtils.smoothstep(z.l, A * 0.2, L1) : 0;
+    lu.uExit.value = exit;
+    // The bloom surges as the ship runs out of the tunnel toward the new sky, and has settled
+    // by the time it's out of the throat (a wide chase view of bright stars would smear).
+    const surge = z && crossed ? Math.sin(Math.PI * THREE.MathUtils.smoothstep(z.l, A * 0.5, L1)) : 0;
+    lu.uAhead.value = crossed ? 1 : -1;
+    // Sound envelope: the roar builds on the way in, near silence in the middle, a swell out.
+    const P = this.passage;
+    const entry = z && !crossed ? 1 - THREE.MathUtils.smoothstep(z.l, A, L2) : 0;
+    const hush = z ? 1 - THREE.MathUtils.smoothstep(z.l, A * 0.45, A * 1.1) : 0;
+    const swell = z && crossed ? THREE.MathUtils.smoothstep(z.l, A * 1.1, L1) : 0;
+    P.entry = THREE.MathUtils.damp(P.entry, entry, entry > P.entry ? 3 : 1.2, dt);
+    P.hush = THREE.MathUtils.damp(P.hush, hush, 2.5, dt);
+    P.swell = THREE.MathUtils.damp(P.swell, swell, swell > P.swell ? 2 : 0.35, dt);
+    this.ambience?.passage(P.entry, P.hush, P.swell);
+    const fade = 1 - flash;
+    this.bloom.strength = 0.3 + this.cine * (0.22 * surge + (this.flashT >= 0 ? 0.35 * fade * fade : 0));
     // Hosted, the story draws its own letterbox.
     this.root.classList.toggle("cine-bars", !this.hostedBy && this.cine > 0.5 && nearThroat > 0.05);
     this.ambience?.flight(this.ship.thrust, this.shake);

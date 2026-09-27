@@ -35,6 +35,11 @@ export class Ambience {
   private engineFilter?: BiquadFilterNode;
   private rumble?: GainNode;
   private rumbleFilter?: BiquadFilterNode;
+  private duck?: GainNode;
+  private swell?: GainNode;
+  private swellFilter?: BiquadFilterNode;
+  /** Extra roar from the wormhole crossing, added to the buffeting. */
+  private roar = 0;
   enabled = false;
   private build(ctx: AudioContext) {
     const master = ctx.createGain();
@@ -45,7 +50,9 @@ export class Ambience {
     limiter.ratio.value = 6;
     limiter.attack.value = 0.01;
     limiter.release.value = 0.3;
-    master.connect(limiter).connect(ctx.destination);
+    // The wormhole's middle ducks everything toward silence.
+    this.duck = ctx.createGain();
+    master.connect(this.duck).connect(limiter).connect(ctx.destination);
     this.gain = master;
     const loop = (buffer: AudioBuffer, rate = 1) => {
       const s = ctx.createBufferSource();
@@ -142,6 +149,42 @@ export class Ambience {
     loop(brown, 0.8).connect(this.rumbleFilter);
     loop(pink, 0.6).connect(this.rumbleFilter);
     this.rumbleFilter.connect(throb).connect(this.rumble).connect(master);
+
+    // The crossing's organ: a full, bright chord an octave up that rises on the way in and
+    // swells on the way out (silent otherwise).
+    this.swellFilter = ctx.createBiquadFilter();
+    this.swellFilter.type = "lowpass";
+    this.swellFilter.frequency.value = 700;
+    this.swellFilter.Q.value = 0.8;
+    this.swell = ctx.createGain();
+    this.swell.gain.value = 0;
+    this.swellFilter.connect(this.swell).connect(master);
+    [220, 329.63, 440, 523.25, 659.25, 880].forEach((frequency, i) => {
+      const voice = ctx.createGain();
+      voice.gain.value = 0.16 / (1 + i * 0.35);
+      for (const detune of [-6, 0, 6]) {
+        const o = ctx.createOscillator();
+        o.type = i < 3 ? "sawtooth" : "triangle";
+        o.frequency.value = frequency;
+        o.detune.value = detune;
+        o.connect(voice);
+        o.start();
+      }
+      voice.connect(this.swellFilter!);
+    });
+  }
+  /**
+   * The wormhole crossing (all 0..1): `entry` builds a roar and a rising organ on the way in,
+   * `hush` pulls everything down to near silence in the middle, `swell` is the organ opening
+   * up on the way out.
+   */
+  passage(entry: number, hush: number, swell: number) {
+    if (!this.ctx || !this.duck || !this.swell || !this.swellFilter) return;
+    const t = this.ctx.currentTime;
+    this.roar = entry * 0.55 + swell * 0.25;
+    this.duck.gain.setTargetAtTime(1 - 0.9 * hush, t, 0.25);
+    this.swell.gain.setTargetAtTime(0.22 * entry + 0.5 * swell, t, 0.4);
+    this.swellFilter.frequency.setTargetAtTime(500 + 900 * entry + 2200 * swell, t, 0.6);
   }
   async toggle() {
     if (!this.ctx) {
@@ -165,8 +208,8 @@ export class Ambience {
       drive = Math.min(1, Math.abs(thrust));
     this.engine.gain.setTargetAtTime(0.08 + drive * 0.55, t, 0.2);
     this.engineFilter.frequency.setTargetAtTime(240 + drive * 900 + turbulence * 400, t, 0.25);
-    this.rumble.gain.setTargetAtTime(turbulence * 0.9, t, 0.35);
-    this.rumbleFilter.frequency.setTargetAtTime(160 + turbulence * 1300, t, 0.5);
+    this.rumble.gain.setTargetAtTime(turbulence * 0.9 + this.roar, t, 0.35);
+    this.rumbleFilter.frequency.setTargetAtTime(160 + turbulence * 1300 + this.roar * 600, t, 0.5);
     this.padFilter.frequency.setTargetAtTime(850 + turbulence * 1600, t, 1.2);
   }
   suspend() {
