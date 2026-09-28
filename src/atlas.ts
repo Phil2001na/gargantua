@@ -1063,6 +1063,10 @@ export class Atlas {
     if (ap?.kind !== "wormhole" || this.ship.side !== "gargantua") return;
     ap.phase = this.ship.zone ? "exit" : "settle";
   }
+  /** Autopilot on to a world on the ship's side (hosted chapters: the cruise to Miller). */
+  hostCruise(id: string) {
+    if (this.hostedBy) this.go(id);
+  }
   /** Hosted chapters choose the look (the player can still flip it with K while flying). */
   setLook(cinematic: boolean) {
     if (this.hostedBy) this.setCinematic(cinematic);

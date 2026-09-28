@@ -211,6 +211,23 @@ export class Story {
     this.ui.fade(0, 0.9);
     this.chapter.start(checkpoint);
   }
+  /**
+   * Carry straight on into another chapter (no menu, no black): the last frame of this one
+   * dissolves over the first frames of the next.
+   */
+  continueTo(id: string, checkpoint?: string, seconds = 2.2) {
+    const shot = this.hosting && this.atlas ? this.atlas.snapshot() : this.snapshot();
+    this.play(id, checkpoint);
+    // The next chapter may open from black; the dissolve covers that instead.
+    this.ui.fade(0, 0);
+    const img = document.createElement("img");
+    img.src = shot;
+    img.alt = "";
+    img.style.cssText = `position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none;transition:opacity ${seconds}s ease`;
+    this.ui.root.prepend(img);
+    requestAnimationFrame(() => requestAnimationFrame(() => (img.style.opacity = "0")));
+    setTimeout(() => img.remove(), seconds * 1000 + 300);
+  }
   private endChapter() {
     this.unhost();
     this.setScene(null);

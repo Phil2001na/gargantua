@@ -75,7 +75,7 @@ skip. No second wormhole renderer.
   - sound: rising organ + roar on entry, near-silence in the middle, a swell on exit (`audio.ts`).
   *Done when:* side-by-side screenshots (entry, middle, exit) look clearly film-like, cost
   stays under +1.5 ms on Intel UHD, physical mode is unchanged.
-- [ ] **A5. Emerge at Gargantua, then Miller with no menu.** Exit beat: the giant fills the
+- [x] **A5. Emerge at Gargantua, then Miller with no menu.** *(2026-09-28: Gargantua shot + crew lines, cruise with dilation readout, dissolve into 07 (`Story.continueTo`); Launch → 06 → 07 verified in one headless run on Intel UHD, no menu, no errors. Deploy NOT done: left for Philip.)* Exit beat: the giant fills the
   view behind the sphere, the crew's reaction, a short cruise toward Miller with the time
   dilation readout, then a crossfade into Chapter 7's descent. Launch's "Fly on toward
   Saturn" now continues into Chapter 6 (free flight stays available from the end cards).

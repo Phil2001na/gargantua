@@ -283,8 +283,9 @@ export class LaunchChapter implements Chapter {
     yield 2;
     this.s.input.capture(false);
     audio.padLevel(0.3, 3);
-    ui.end("Chapter five complete", "Liftoff", "From the pad to orbit without a cut. The Endurance can take it from here: the atlas flies you on to Saturn, and back down to the farm whenever you like.", [
-      ["Fly on toward Saturn ▶", () => this.s.leaveForAtlas()],
+    ui.end("Chapter five complete", "Liftoff", "From the pad to orbit without a cut. Next: two years asleep, and Saturn. Or take the Endurance out on your own in free flight.", [
+      ["Fly on toward Saturn ▶", () => this.s.play("wormhole")],
+      ["Free flight from Earth orbit", () => this.s.leaveForAtlas()],
       ["Take the Ranger back down", () => this.s.play("launch", "home")],
       ["Replay chapter", () => this.s.restart(false)],
       ["Chapters", () => this.s.toMenu()],

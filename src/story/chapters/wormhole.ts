@@ -16,6 +16,19 @@ const KEYS = `Fly: <kbd>W</kbd>/<kbd>S</kbd> thrust · <kbd>A</kbd><kbd>D</kbd> 
 
 type Shot = { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number };
 const UP = new THREE.Vector3(0, 1, 0);
+/** Length of the cruise toward Miller before the dissolve into Chapter 7 (seconds). */
+const CRUISE = 26;
+/** Miller's surface: seven years of Earth time per hour. */
+const MILLER_DILATION = (7 * 365.25 * 24) / 1;
+/** "1 hour aboard = …" in Earth time, for the readout. */
+function earthSpan(hours: number) {
+  if (hours < 2) return `${Math.round(hours * 60)} min`;
+  if (hours < 48) return `${hours.toFixed(1)} h`;
+  const days = hours / 24;
+  if (days < 365.25) return `${Math.round(days)} days`;
+  const years = days / 365.25;
+  return `${years.toFixed(years < 10 ? 1 : 0)} years`;
+}
 const smooth = (x: number) => THREE.MathUtils.smoothstep(x, 0, 1);
 
 function aim(pos: THREE.Vector3, target: THREE.Vector3, up = UP, fov = 50): Shot {
@@ -29,7 +42,9 @@ export class WormholeChapter implements Chapter {
   checkpoint = "start";
   modal = false;
   private atlas!: Atlas;
-  private stage: "arrival" | "approach" | "crossing" | "through" | "end" = "arrival";
+  private stage: "arrival" | "approach" | "crossing" | "through" | "cruise" | "end" = "arrival";
+  /** Seconds into the cruise toward Miller (drives the dilation readout). */
+  private cruiseT = 0;
   /** Chapter time (stops while paused), for the script's safety timeouts and camera moves. */
   private clock = 0;
   /** The atlas counts crossings for its whole life; this chapter's start from here. */
@@ -74,11 +89,27 @@ export class WormholeChapter implements Chapter {
     } else if (this.stage === "approach" || this.stage === "crossing") {
       this.stage = "through";
       this.s.run(() => this.skipped());
+    } else if (this.stage === "through" || this.stage === "cruise") {
+      // Past the crossing, a skip goes straight on to Miller.
+      this.stage = "end";
+      this.s.run(() => this.toMiller(true));
     }
   }
   update(dt: number) {
     this.clock += dt;
     if (this.flying && !this.handFlown && this.crossed) this.handFlown = true;
+    if (this.stage === "cruise") {
+      // The dilation readout: what an hour here costs back home, climbing toward Miller's
+      // seven years as the Endurance drops in toward Gargantua.
+      this.cruiseT += dt;
+      const k = THREE.MathUtils.smoothstep(this.cruiseT / CRUISE, 0, 1);
+      const f = Math.exp(Math.log(1.02) + (Math.log(MILLER_DILATION) - Math.log(1.02)) * k * k);
+      this.s.ui.telemetry([
+        ["Time dilation", `×${f < 10 ? f.toFixed(2) : Math.round(f).toLocaleString("en-GB")}`],
+        ["1 hour here", `${earthSpan(f)} on Earth`],
+        ["Miller", k < 0.98 ? "closing" : "descent"],
+      ]);
+    }
     // T hands the stick to TARS at any point while Cooper is flying (even deep in the throat).
     if (this.flying && !this.tars && this.s.input.hit("KeyT")) this.handOver("asked");
     if (this.shot) this.atlas.setHostShot(this.shot(this.clock - this.shotStart));
@@ -409,26 +440,75 @@ export class WormholeChapter implements Chapter {
     yield 1;
     yield* this.emerged();
   }
+  // --- Out the other side (A5) ------------------------------------------------------
   private *emerged(): Generator<Wait> {
     const { ui } = this.s;
-    const byHand = this.handFlown;
     this.stage = "through";
     yield ui.say("Romilly", "That's not our sky.");
+    if (this.handFlown) yield ui.say("TARS", "Nice flying, Cooper. First ever, and not a scratch on her.");
+    // TARS brings her about to face the new sky's landmark.
     yield this.until(() => this.state.autopilot === null, 25);
+    // The giant: a slow drift out from behind the ship, the sphere at our backs and
+    // Gargantua filling the view ahead.
+    const g = new THREE.Vector3();
+    const s0 = this.atlas.saturnFrame.ship;
+    const toG = g.clone().sub(s0).normalize();
+    const side = UP.clone().cross(toG).normalize();
+    this.setShot((t) => {
+      const s = this.atlas.saturnFrame.ship;
+      const k = smooth(Math.min(1, t / 18));
+      const pos = s
+        .clone()
+        .addScaledVector(toG, -0.03 - 0.25 * k)
+        .addScaledVector(side, 0.012 + 0.06 * k)
+        .addScaledVector(UP, 0.006 + 0.05 * k);
+      return aim(pos, s.clone().lerp(g, 0.25 + 0.2 * k), UP, 48 - 6 * k);
+    });
     yield ui.say("Cooper", "Gargantua. There it is.");
-    yield ui.say("Brand", "Miller's signal is coming from the first planet. Closest to it.");
-    yield 1.5;
+    yield ui.say("Doyle", "It's bending the light from everything behind it. The whole sky's pouring round it.");
+    yield ui.say("Brand", "Miller's signal is coming from the first planet in. The one closest to it.");
+    yield ui.say("Romilly", "That close to something that heavy, time runs slow. Much slower than here.");
+    yield* this.cruise();
+  }
+  /** The short run in toward Miller, the dilation readout climbing, then straight into 07. */
+  private *cruise(): Generator<Wait> {
+    const { ui } = this.s;
+    this.stage = "cruise";
+    this.atlas.hostCruise("miller");
+    // Keep the giant in frame behind the ship as she turns and runs in toward Miller.
+    const g = new THREE.Vector3();
+    this.setShot((t) => {
+      const s = this.atlas.saturnFrame.ship;
+      const toG = g.clone().sub(s).normalize();
+      const side = UP.clone().cross(toG).normalize();
+      const k = smooth(Math.min(1, t / CRUISE));
+      const pos = s
+        .clone()
+        .addScaledVector(toG, -0.05 - 0.12 * k)
+        .addScaledVector(side, 0.02 + 0.03 * k)
+        .addScaledVector(UP, 0.012 + 0.02 * k);
+      return aim(pos, s.clone().lerp(g, 0.45), UP, 42 + 6 * k);
+    });
+    this.cruiseT = 0;
+    yield ui.say("TARS", "Course laid in for Miller. I'll put the dilation on the board.");
+    yield ui.say("Cooper", "How slow is slow?");
+    yield ui.say("Romilly", "On the surface: every hour we spend there, seven years go by back home.");
+    yield ui.say("Doyle", "Seven years. Per hour.");
+    yield ui.say("Brand", "Then we plan it to the minute. In, get Miller's data, out.");
+    yield this.until(() => this.cruiseT > CRUISE, CRUISE);
+    yield* this.toMiller(false);
+  }
+  /** Hand straight over to Chapter 7's descent: a dissolve, not a menu. */
+  private *toMiller(skipped: boolean): Generator<Wait> {
+    const { ui } = this.s;
     this.stage = "end";
-    this.s.cinematicMode = false;
-    ui.end(
-      "Chapter six complete",
-      "The Wormhole",
-      `Two years to Saturn, then through the sphere ${byHand ? "by hand" : "with TARS at the controls"} and out under another galaxy's sky.`,
-      [
-        ["On to Miller ▶", () => this.s.play("miller")],
-        ["Replay chapter", () => this.s.restart(false)],
-        ["Chapters", () => this.s.toMenu()],
-      ],
-    );
+    ui.clearLines();
+    ui.telemetry(null);
+    if (skipped) yield ui.fade(1, 0.6);
+    // Outside this script's step: starting the next chapter replaces the running script.
+    queueMicrotask(() => {
+      if (skipped) this.s.play("miller");
+      else this.s.continueTo("miller");
+    });
   }
 }
