@@ -1,11 +1,23 @@
 # Project updates
 
 ## 2026-09-28
+### 03:06
+- Chapter 6 A5: out the other side, a slow shot of Gargantua filling the view with the crew's reactions, then a ~26 s cruise toward Miller with a time-dilation readout climbing to "1 hour here = 7 years on Earth", and a dissolve straight into Chapter 7's descent (no end card, no menu; Space skips on to Miller).
+- Chapter 5's "Fly on toward Saturn" now continues into Chapter 6; free flight from Earth orbit is its own button on that end card. Checked the full run 5 → 6 → 7 in one go. Not deployed (left for Philip).
+
+### 01:47
+- Chapter 6 A4, the film-like passage (cinematic look only): the tunnel's light lanes are now the real skies at either end, streamed past as motion-blurred, gently rippling streaks with red/blue fringes; a ring flash as the camera goes into the sphere; the exit sky grows ahead as a brighter disc with a short bloom surge. Physical look unchanged. Measured +0.85 ms over the old cinematic in the throat on Intel UHD (1280×720).
+- Crossing sound: a roar and rising organ on the way in, near silence in the middle, an organ swell on the way out (story audio in Chapter 6; the atlas ambience gets the same envelope in free flight).
+
 ### 00:35
 - Sky is now the real Milky Way: NASA SVS Deep Star Maps 2020 (Gaia DR2) diffuse map, baked to 4K/8K sRGB JPEGs in `public/textures`. It swaps in place over the procedural band (`src/sky.ts`), so every renderer (observatory, atlas, wormhole lens) gets it and it lenses correctly; desktop GPUs load 8K, phones 4K. Point stars stay procedural so they stay sharp under lensing.
 - Story mode pause menu: "Graphics: Adaptive / High (locked)" holds full resolution, MSAA and bloom (also in the hosted atlas via new `Atlas.setQuality`); remembered in localStorage.
 
 ## 2026-09-27
+
+### 23:54
+- Chapter 6 A3 finished and verified: the piloted crossing plays end to end in both looks (by hand, by TARS, TARS taking over mid-way, K mid-way, skip in the throat).
+- Fixes: T hands over at any point (it was ignored once inside the field), K works while TARS flies, a skipped crossing takes the stick back, a drifting pilot is brought out after 12 s instead of 40, and the end card says who flew it.
 
 ### 01:55
 - Chapter 6 A2: arrival at Saturn (wake from cryo, ring flyby with the planet's shadow on the rings, first sight of the sphere, Romilly's paper-fold explanation) before TARS flies it through. Started by the Agents Chat Claude, finished and verified here.

@@ -59,13 +59,13 @@ skip. No second wormhole renderer.
   where it reads as a hole in the sky. Original dialogue: the "why a sphere" explanation (a
   hologram fold of paper and pencil, drawn as a simple overlay or 3D sheet).
   *Done when:* 2–3 minutes from wake-up to "take us in", skippable, measured on Intel UHD.
-- [ ] **A3. The crossing, piloted.** Cooper flies the approach by hand (or TARS on `T`),
+- [x] **A3. The crossing, piloted.** *(2026-09-27: verified headless on Intel UHD in both looks: TARS-flown, hand-flown, T mid-way, K mid-way, hold-Space skip in the throat; handshake lines land on the wavefront, cockpit in the throat, chase after, no hull clipping; 37–60 fps. Fixed: T and K now work at any point, skip takes the stick back, no late "coming out" line.)* Cooper flies the approach by hand (or TARS on `T`),
   with a choice before entry: **Physical** or **Cinematic** look (K still toggles mid-way).
   Phase-driven lines (entering / inside / emerging), harder buffeting, the silence in the
   middle, and "their" handshake: the ripple passes through the cabin and Brand reaches toward
   it (a cockpit-view moment; an abstract distortion, not a figure).
   *Done when:* both looks play end to end with no desync, and the camera never clips the hull.
-- [ ] **A4. Make the passage look like the film.** Upgrade `shaders/lens.frag` cinematic mode:
+- [x] **A4. Make the passage look like the film.** *(2026-09-28: lanes built from both real skies (same stars as the sky, streaked, rippling, fringed), ring flash on entry, growing exit disc + short bloom surge, Saturn's lensed images read on approach; roar/organ in, hush, swell out. +0.85 ms vs the old cinematic in the throat on Intel UHD at 1280×720; physical path untouched.)* Upgrade `shaders/lens.frag` cinematic mode:
   - light lanes built from the *actual* lensed destination sky, stretched along the throat
     (motion-blurred galaxy, not procedural noise), with the exit growing ahead as a bright disc;
   - entry "splash": the sphere's surface engulfs the frame with a brief ring flash;
@@ -75,7 +75,7 @@ skip. No second wormhole renderer.
   - sound: rising organ + roar on entry, near-silence in the middle, a swell on exit (`audio.ts`).
   *Done when:* side-by-side screenshots (entry, middle, exit) look clearly film-like, cost
   stays under +1.5 ms on Intel UHD, physical mode is unchanged.
-- [ ] **A5. Emerge at Gargantua, then Miller with no menu.** Exit beat: the giant fills the
+- [x] **A5. Emerge at Gargantua, then Miller with no menu.** *(2026-09-28: Gargantua shot + crew lines, cruise with dilation readout, dissolve into 07 (`Story.continueTo`); Launch → 06 → 07 verified in one headless run on Intel UHD, no menu, no errors. Deploy NOT done: left for Philip.)* Exit beat: the giant fills the
   view behind the sphere, the crew's reaction, a short cruise toward Miller with the time
   dilation readout, then a crossfade into Chapter 7's descent. Launch's "Fly on toward
   Saturn" now continues into Chapter 6 (free flight stays available from the end cards).
